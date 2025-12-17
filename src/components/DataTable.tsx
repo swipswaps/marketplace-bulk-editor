@@ -142,11 +142,11 @@ export function DataTable({ data, onUpdate }: DataTableProps) {
               ].map(({ field, label }) => (
                 <th
                   key={field}
-                  className="px-4 py-2 border-b text-left font-medium text-gray-700 relative select-none"
-                  style={{ width: columnWidths[field] }}
+                  className="px-4 py-2 border-b text-left font-medium text-gray-700 relative select-none group"
+                  style={{ width: columnWidths[field], position: 'relative' }}
                 >
                   <div
-                    className="flex items-center gap-2 cursor-pointer hover:text-blue-600"
+                    className="flex items-center gap-2 cursor-pointer hover:text-blue-600 pr-2"
                     onClick={() => handleSort(field)}
                   >
                     <span>{label}</span>
@@ -160,12 +160,14 @@ export function DataTable({ data, onUpdate }: DataTableProps) {
                       <ArrowUpDown size={14} className="text-gray-400" />
                     )}
                   </div>
-                  {/* Resize handle */}
+                  {/* Resize handle - wider hit area */}
                   <div
-                    className="absolute top-0 right-0 w-2 h-full cursor-col-resize hover:bg-blue-500 transition-colors z-10"
+                    className="absolute top-0 right-0 h-full cursor-col-resize group-hover:bg-blue-100"
                     style={{
+                      width: '8px',
+                      marginRight: '-4px',
                       background: resizing?.column === field ? '#3b82f6' : 'transparent',
-                      borderRight: '2px solid transparent',
+                      zIndex: 20,
                     }}
                     onMouseDown={(e) => {
                       e.preventDefault();
@@ -176,15 +178,15 @@ export function DataTable({ data, onUpdate }: DataTableProps) {
                         startWidth: columnWidths[field],
                       });
                     }}
-                    onMouseEnter={(e) => {
-                      (e.target as HTMLElement).style.borderRight = '2px solid #3b82f6';
-                    }}
-                    onMouseLeave={(e) => {
-                      if (resizing?.column !== field) {
-                        (e.target as HTMLElement).style.borderRight = '2px solid transparent';
-                      }
-                    }}
-                  />
+                  >
+                    {/* Visual indicator line */}
+                    <div
+                      className="absolute right-0 top-0 h-full w-0.5 bg-gray-300 group-hover:bg-blue-500"
+                      style={{
+                        background: resizing?.column === field ? '#3b82f6' : undefined,
+                      }}
+                    />
+                  </div>
                 </th>
               ))}
               <th className="px-4 py-2 border-b text-left font-medium text-gray-700" style={{ width: 100 }}>
