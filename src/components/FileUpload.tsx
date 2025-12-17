@@ -56,53 +56,26 @@ export function FileUpload({ onDataLoaded }: FileUploadProps) {
   return (
     <div
       {...getRootProps()}
-      className={`relative border-2 border-dashed rounded-xl p-8 sm:p-12 text-center cursor-pointer transition-all duration-300 ${
+      className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
         isDragActive
-          ? 'border-blue-500 bg-gradient-to-br from-blue-50 to-purple-50 scale-105 shadow-xl'
-          : 'border-gray-300 bg-white hover:border-blue-400 hover:shadow-lg hover:scale-102'
+          ? 'border-blue-500 bg-blue-50'
+          : 'border-gray-300 bg-white hover:border-gray-400'
       }`}
     >
       <input {...getInputProps()} />
-      <div className={`transition-all duration-300 ${isDragActive ? 'scale-110' : ''}`}>
-        <div className="p-4 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-4 flex items-center justify-center">
-          <Upload className={`h-8 w-8 sm:h-10 sm:w-10 transition-colors ${
-            isDragActive ? 'text-blue-600' : 'text-blue-500'
-          }`} />
+      <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+      {isDragActive ? (
+        <p className="text-lg text-blue-600">Drop the files here...</p>
+      ) : (
+        <div>
+          <p className="text-lg text-gray-700 mb-2">
+            Drag & drop Excel files here, or click to select
+          </p>
+          <p className="text-sm text-gray-500">
+            Supports .xlsx, .xls, and .csv files
+          </p>
         </div>
-        {isDragActive ? (
-          <div>
-            <p className="text-lg sm:text-xl font-semibold text-blue-600 mb-2">
-              Drop the files here! 🎯
-            </p>
-            <p className="text-sm text-blue-500">
-              Release to upload
-            </p>
-          </div>
-        ) : (
-          <div>
-            <p className="text-base sm:text-lg font-semibold text-gray-800 mb-2">
-              📁 Drag & drop Excel files here
-            </p>
-            <p className="text-sm sm:text-base text-gray-600 mb-3">
-              or click to browse your files
-            </p>
-            <div className="flex flex-wrap justify-center gap-2 text-xs sm:text-sm">
-              <span className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full border border-blue-200">
-                .xlsx
-              </span>
-              <span className="px-3 py-1 bg-green-50 text-green-700 rounded-full border border-green-200">
-                .xls
-              </span>
-              <span className="px-3 py-1 bg-purple-50 text-purple-700 rounded-full border border-purple-200">
-                .csv
-              </span>
-            </div>
-            <p className="text-xs text-gray-400 mt-4">
-              💡 You can upload multiple files at once
-            </p>
-          </div>
-        )}
-      </div>
+      )}
     </div>
   );
 }
