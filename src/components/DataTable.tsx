@@ -581,12 +581,7 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
                       type="text"
                       list="price-suggestions"
                       value={listing.PRICE}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        // Remove leading zeros while typing (except for "0" or "0.")
-                        const cleanedValue = value.replace(/^0+(?=\d)/, '');
-                        handleCellUpdate(listing.id, 'PRICE', cleanedValue || '0');
-                      }}
+                      onChange={(e) => handleCellUpdate(listing.id, 'PRICE', e.target.value.replace(/^0+(?=\d)/, '') || '0')}
                       onBlur={() => setEditingCell(null)}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') {
