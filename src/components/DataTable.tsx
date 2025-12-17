@@ -27,9 +27,17 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
   const [resizing, setResizing] = useState<{ column: string; startX: number; startWidth: number; colIndex: number } | null>(null);
   const tableRef = useRef<HTMLTableElement>(null);
 
-  // Extract unique categories from all listings for autocomplete
+  // Extract unique values from all listings for autocomplete
   const uniqueCategories = Array.from(
     new Set(data.map(item => item.CATEGORY).filter(cat => cat && cat.trim() !== ''))
+  ).sort();
+
+  const uniqueTitles = Array.from(
+    new Set(data.map(item => item.TITLE).filter(title => title && title.trim() !== ''))
+  ).sort();
+
+  const uniqueDescriptions = Array.from(
+    new Set(data.map(item => item.DESCRIPTION).filter(desc => desc && desc.trim() !== ''))
   ).sort();
 
   // Handle column resizing with mouse events
@@ -240,6 +248,7 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
                   {editingCell?.id === listing.id && editingCell?.field === 'TITLE' ? (
                     <input
                       type="text"
+                      list="title-suggestions"
                       value={listing.TITLE}
                       onChange={(e) => handleCellUpdate(listing.id, 'TITLE', e.target.value)}
                       onBlur={() => setEditingCell(null)}
@@ -250,6 +259,7 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
                       }}
                       maxLength={150}
                       className="w-full px-2 py-1 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      autoComplete="off"
                       autoFocus
                     />
                   ) : (
@@ -312,31 +322,40 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
                   onClick={() => setEditingCell({ id: listing.id, field: 'DESCRIPTION' })}
                 >
                   {editingCell?.id === listing.id && editingCell?.field === 'DESCRIPTION' ? (
-                    <textarea
-                      value={listing.DESCRIPTION}
-                      onChange={(e) => {
-                        handleCellUpdate(listing.id, 'DESCRIPTION', e.target.value);
-                        // Auto-resize textarea
-                        e.target.style.height = 'auto';
-                        e.target.style.height = e.target.scrollHeight + 'px';
-                      }}
-                      onBlur={() => setEditingCell(null)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
-                          e.preventDefault();
-                          setEditingCell(null);
-                        }
-                      }}
-                      maxLength={5000}
-                      className="w-full px-2 py-1 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none overflow-hidden"
-                      style={{ minHeight: '60px' }}
-                      autoFocus
-                      onFocus={(e) => {
-                        // Auto-resize on focus
-                        e.target.style.height = 'auto';
-                        e.target.style.height = e.target.scrollHeight + 'px';
-                      }}
-                    />
+                    <>
+                      <textarea
+                        list="description-suggestions"
+                        value={listing.DESCRIPTION}
+                        onChange={(e) => {
+                          handleCellUpdate(listing.id, 'DESCRIPTION', e.target.value);
+                          // Auto-resize textarea
+                          e.target.style.height = 'auto';
+                          e.target.style.height = e.target.scrollHeight + 'px';
+                        }}
+                        onBlur={() => setEditingCell(null)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            setEditingCell(null);
+                          }
+                        }}
+                        maxLength={5000}
+                        className="w-full px-2 py-1 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none overflow-hidden"
+                        style={{ minHeight: '60px' }}
+                        autoComplete="off"
+                        autoFocus
+                        onFocus={(e) => {
+                          // Auto-resize on focus
+                          e.target.style.height = 'auto';
+                          e.target.style.height = e.target.scrollHeight + 'px';
+                        }}
+                      />
+                      <datalist id="description-suggestions">
+                        {uniqueDescriptions.map((desc, index) => (
+                          <option key={index} value={desc} />
+                        ))}
+                      </datalist>
+                    </>
                   ) : (
                     <div className="whitespace-pre-wrap" title={listing.DESCRIPTION}>{listing.DESCRIPTION || <span className="text-gray-400">Click to edit</span>}</div>
                   )}
@@ -409,7 +428,13 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
         </table>
       </div>
 
-      {/* Datalist for category autocomplete */}
+      {/* Datalists for autocomplete */}
+      <datalist id="title-suggestions">
+        {uniqueTitles.map((title, index) => (
+          <option key={index} value={title} />
+        ))}
+      </datalist>
+
       <datalist id="category-suggestions">
         {uniqueCategories.map((category, index) => (
           <option key={index} value={category} />
