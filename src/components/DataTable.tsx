@@ -574,34 +574,19 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
                   }}
                 >
                   {editingCell?.id === listing.id && editingCell?.field === 'PRICE' ? (
-                    <>
                     <input
                       type="text"
-                      list={`price-suggestions-${uniquePrices.length}`}
+                      list="price-suggestions"
                       value={listing.PRICE}
                       onChange={(e) => {
                         const value = e.target.value;
                         // Remove leading zeros while typing (except for "0" or "0.")
                         const cleanedValue = value.replace(/^0+(?=\d)/, '');
-                        // Always save as number to ensure dropdown updates
-                        const numValue = cleanedValue === '' ? 0 : parseFloat(cleanedValue) || 0;
-                        handleCellUpdate(listing.id, 'PRICE', numValue);
+                        handleCellUpdate(listing.id, 'PRICE', cleanedValue || '0');
                       }}
-                      onBlur={() => {
-                        // Ensure final value is a valid number
-                        const finalValue = parseFloat(String(listing.PRICE)) || 0;
-                        if (listing.PRICE !== finalValue) {
-                          handleCellUpdate(listing.id, 'PRICE', finalValue);
-                        }
-                        setEditingCell(null);
-                      }}
+                      onBlur={() => setEditingCell(null)}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') {
-                          // Ensure final value is a valid number
-                          const finalValue = parseFloat(String(listing.PRICE)) || 0;
-                          if (listing.PRICE !== finalValue) {
-                            handleCellUpdate(listing.id, 'PRICE', finalValue);
-                          }
                           setEditingCell(null);
                         } else if (e.key === 'Escape') {
                           setEditingCell(null);
@@ -611,14 +596,8 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
                       autoComplete="off"
                       autoFocus
                     />
-                    <datalist id={`price-suggestions-${uniquePrices.length}`}>
-                      {uniquePrices.map((price, index) => (
-                        <option key={index} value={String(price)} />
-                      ))}
-                    </datalist>
-                    </>
                   ) : (
-                    <div>${typeof listing.PRICE === 'number' ? listing.PRICE.toFixed(2) : listing.PRICE}</div>
+                    <div>{listing.PRICE || <span className="text-gray-400 dark:text-gray-500">Click to edit</span>}</div>
                   )}
                 </td>}
 
@@ -802,6 +781,12 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
       <datalist id="category-suggestions">
         {uniqueCategories.map((category, index) => (
           <option key={index} value={category} />
+        ))}
+      </datalist>
+
+      <datalist id="price-suggestions">
+        {uniquePrices.map((price, index) => (
+          <option key={index} value={price} />
         ))}
       </datalist>
     </div>
