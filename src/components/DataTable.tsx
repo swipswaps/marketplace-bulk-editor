@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Trash2, Plus, ArrowUpDown, ArrowUp, ArrowDown, Copy, Eye, EyeOff } from 'lucide-react';
+import { Trash2, Plus, ArrowUpDown, ArrowUp, ArrowDown, Copy, Eye } from 'lucide-react';
 import type { MarketplaceListing } from '../types';
 import { CONDITIONS } from '../types';
 
@@ -19,7 +19,7 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
   const [lastSaved, setLastSaved] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [showDebugPanel, setShowDebugPanel] = useState(false);
-  const [visibleColumns, setVisibleColumns] = useState<Record<keyof MarketplaceListing, boolean>>({
+  const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>({
     TITLE: true,
     PRICE: true,
     CONDITION: true,
@@ -645,7 +645,6 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
                   {editingCell?.id === listing.id && editingCell?.field === 'DESCRIPTION' ? (
                     <>
                       <textarea
-                        list="description-suggestions"
                         value={listing.DESCRIPTION}
                         onChange={(e) => {
                           handleCellUpdate(listing.id, 'DESCRIPTION', e.target.value);

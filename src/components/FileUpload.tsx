@@ -28,7 +28,7 @@ export function FileUpload({ onDataLoaded }: FileUploadProps) {
           let emptyDescriptions = 0;
 
           // Transform data to MarketplaceListing format
-          const listings: MarketplaceListing[] = jsonData.map((row, index) => {
+          const listings: MarketplaceListing[] = jsonData.map((row) => {
             // Check for validation issues
             if (!row.TITLE || row.TITLE.trim() === '') {
               emptyTitles++;
