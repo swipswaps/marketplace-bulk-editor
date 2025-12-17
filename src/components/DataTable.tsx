@@ -43,6 +43,21 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
   });
   const [resizing, setResizing] = useState<{ column: string; startX: number; startWidth: number; colIndex: number } | null>(null);
   const tableRef = useRef<HTMLTableElement>(null);
+  const priceDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showPriceDropdown && priceDropdownRef.current && !priceDropdownRef.current.contains(event.target as Node)) {
+        setShowPriceDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showPriceDropdown]);
 
   // Extract unique values from all listings for autocomplete
   const uniqueCategories = Array.from(
@@ -576,7 +591,7 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
                   }}
                 >
                   {editingCell?.id === listing.id && editingCell?.field === 'PRICE' ? (
-                    <div className="relative">
+                    <div className="relative" ref={priceDropdownRef}>
                       <input
                         ref={priceInputRef}
                         type="text"
@@ -589,21 +604,14 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
                           const cleanedValue = digitsOnly.replace(/^0+(?=\d)/, '');
                           handleCellUpdate(listing.id, 'PRICE', cleanedValue || '0');
                         }}
-                        onFocus={(e) => {
-                          const rect = e.target.getBoundingClientRect();
+                        onClick={(e) => {
+                          const rect = e.currentTarget.getBoundingClientRect();
                           setPriceDropdownPosition({
                             top: rect.bottom + window.scrollY,
                             left: rect.left + window.scrollX,
                             width: rect.width
                           });
                           setShowPriceDropdown(true);
-                        }}
-                        onBlur={(e) => {
-                          // Delay to allow click on dropdown
-                          setTimeout(() => {
-                            setShowPriceDropdown(false);
-                            setEditingCell(null);
-                          }, 200);
                         }}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') {
@@ -618,6 +626,24 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
                         autoComplete="off"
                         autoFocus
                       />
+                      {/* Dropdown appears right below the input */}
+                      {showPriceDropdown && uniquePrices.length > 0 && (
+                        <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border-2 border-blue-500 dark:border-blue-400 rounded shadow-2xl max-h-48 overflow-y-auto z-50">
+                          {uniquePrices.map((price, index) => (
+                            <div
+                              key={index}
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                handleCellUpdate(listing.id, 'PRICE', price);
+                                setShowPriceDropdown(false);
+                              }}
+                              className="px-3 py-2 cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900 text-gray-900 dark:text-gray-100 border-b dark:border-gray-700 last:border-b-0"
+                            >
+                              {price}
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div>{listing.PRICE}</div>
@@ -853,36 +879,7 @@ Should show dropdown: ${showPriceDropdown && priceDropdownPosition && uniquePric
         )}
       </div>
 
-      {/* Custom Price Dropdown - Positioned absolutely outside table */}
-      {showPriceDropdown && priceDropdownPosition && uniquePrices.length > 0 && (
-        <div
-          style={{
-            position: 'fixed',
-            top: `${priceDropdownPosition.top}px`,
-            left: `${priceDropdownPosition.left}px`,
-            width: `${priceDropdownPosition.width}px`,
-            zIndex: 9999
-          }}
-          className="bg-white dark:bg-gray-800 border-2 border-blue-500 dark:border-blue-400 rounded shadow-2xl max-h-48 overflow-y-auto"
-        >
-          {uniquePrices.map((price, index) => (
-            <div
-              key={index}
-              onMouseDown={(e) => {
-                e.preventDefault();
-                if (editingCell) {
-                  handleCellUpdate(editingCell.id, 'PRICE', price);
-                  setShowPriceDropdown(false);
-                  setEditingCell(null);
-                }
-              }}
-              className="px-3 py-2 cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900 text-gray-900 dark:text-gray-100 border-b dark:border-gray-700 last:border-b-0"
-            >
-              {price}
-            </div>
-          ))}
-        </div>
-      )}
+
     </div>
   );
 }
