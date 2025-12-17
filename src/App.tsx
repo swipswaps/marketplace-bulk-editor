@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { FileUpload } from './components/FileUpload';
 import { DataTable } from './components/DataTable';
 import { ExportButton } from './components/ExportButton';
@@ -61,22 +61,22 @@ function App() {
   };
 
   // Undo handler
-  const handleUndo = () => {
+  const handleUndo = useCallback(() => {
     if (historyIndex > 0) {
       const newIndex = historyIndex - 1;
       setHistoryIndex(newIndex);
       setListings(history[newIndex]);
     }
-  };
+  }, [historyIndex, history]);
 
   // Redo handler
-  const handleRedo = () => {
+  const handleRedo = useCallback(() => {
     if (historyIndex < history.length - 1) {
       const newIndex = historyIndex + 1;
       setHistoryIndex(newIndex);
       setListings(history[newIndex]);
     }
-  };
+  }, [historyIndex, history]);
 
   // Keyboard shortcuts for undo/redo
   useEffect(() => {
@@ -92,7 +92,7 @@ function App() {
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [historyIndex, history]);
+  }, [historyIndex, history, handleUndo, handleRedo]);
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-900 transition-colors">

@@ -146,7 +146,7 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
     }
   };
 
-  const handleCellUpdate = (id: string, field: keyof MarketplaceListing, value: any) => {
+  const handleCellUpdate = (id: string, field: keyof MarketplaceListing, value: string | number) => {
     const updatedData = data.map(item =>
       item.id === id ? { ...item, [field]: value } : item
     );
@@ -200,7 +200,7 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
     }
   };
 
-  const handleBulkEdit = (field: keyof MarketplaceListing, value: any) => {
+  const handleBulkEdit = (field: keyof MarketplaceListing, value: string | number) => {
     if (selectedRows.size === 0) return;
 
     const updatedData = data.map(item =>

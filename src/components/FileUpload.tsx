@@ -19,7 +19,7 @@ export function FileUpload({ onDataLoaded }: FileUploadProps) {
           const workbook = XLSX.read(data, { type: 'binary' });
           const sheetName = workbook.SheetNames[0];
           const worksheet = workbook.Sheets[sheetName];
-          const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
+          const jsonData = XLSX.utils.sheet_to_json(worksheet) as Record<string, string | number>[];
 
           // Validation warnings
           const warnings: string[] = [];
@@ -30,24 +30,27 @@ export function FileUpload({ onDataLoaded }: FileUploadProps) {
           // Transform data to MarketplaceListing format
           const listings: MarketplaceListing[] = jsonData.map((row) => {
             // Check for validation issues
-            if (!row.TITLE || row.TITLE.trim() === '') {
+            const title = String(row.TITLE || '');
+            const description = String(row.DESCRIPTION || '');
+
+            if (!title || title.trim() === '') {
               emptyTitles++;
             }
             if (!row.PRICE || isNaN(Number(row.PRICE)) || Number(row.PRICE) <= 0) {
               invalidPrices++;
             }
-            if (!row.DESCRIPTION || row.DESCRIPTION.trim() === '') {
+            if (!description || description.trim() === '') {
               emptyDescriptions++;
             }
 
             return {
               id: crypto.randomUUID(),
-              TITLE: row.TITLE || '',
+              TITLE: title,
               PRICE: row.PRICE || 0,
-              CONDITION: row.CONDITION || 'New',
-              DESCRIPTION: row.DESCRIPTION || '',
-              CATEGORY: row.CATEGORY || 'Electronics',
-              'OFFER SHIPPING': row['OFFER SHIPPING'] || 'No'
+              CONDITION: String(row.CONDITION || 'New'),
+              DESCRIPTION: description,
+              CATEGORY: String(row.CATEGORY || 'Electronics'),
+              'OFFER SHIPPING': String(row['OFFER SHIPPING'] || 'No')
             };
           });
 

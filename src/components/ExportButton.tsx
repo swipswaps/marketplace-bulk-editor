@@ -17,7 +17,7 @@ export function ExportButton({ data, sortField, sortDirection }: ExportButtonPro
 
   const getSortedData = () => {
     // Sort data if a sort is active
-    let sortedData = [...data];
+    const sortedData = [...data];
     if (sortField && sortDirection) {
       sortedData.sort((a, b) => {
         const aVal = a[sortField];
@@ -41,6 +41,7 @@ export function ExportButton({ data, sortField, sortDirection }: ExportButtonPro
     const sortedData = getSortedData();
 
     // Prepare data for export (remove id field)
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const exportData = sortedData.map(({ id, ...rest }) => rest);
 
     // Create workbook and worksheet
