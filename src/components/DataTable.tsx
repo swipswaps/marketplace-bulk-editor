@@ -793,9 +793,9 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
         ))}
       </datalist>
 
-      <datalist id="price-suggestions">
+      <datalist id="price-suggestions" key={uniquePrices.join(',')}>
         {uniquePrices.map((price, index) => (
-          <option key={index} value={price as number} />
+          <option key={index} value={String(price)} />
         ))}
       </datalist>
     </div>
