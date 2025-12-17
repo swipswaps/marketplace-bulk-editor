@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Trash2, Edit2, Save, X, Plus } from 'lucide-react';
 import type { MarketplaceListing } from '../types';
-import { CONDITIONS, CATEGORIES } from '../types';
+import { CONDITIONS } from '../types';
 
 interface DataTableProps {
   data: MarketplaceListing[];
@@ -126,15 +126,13 @@ export function DataTable({ data, onUpdate }: DataTableProps) {
                       />
                     </td>
                     <td className="px-4 py-2 border-b">
-                      <select
+                      <input
+                        type="text"
                         value={editForm.CATEGORY}
                         onChange={(e) => updateField('CATEGORY', e.target.value)}
                         className="w-full px-2 py-1 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      >
-                        {CATEGORIES.map(cat => (
-                          <option key={cat} value={cat}>{cat}</option>
-                        ))}
-                      </select>
+                        placeholder="e.g. Home & Garden"
+                      />
                     </td>
                     <td className="px-4 py-2 border-b">
                       <select

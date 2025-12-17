@@ -23,12 +23,3 @@ export const CONDITIONS = [
   'Used - Good',
   'Used - Fair'
 ] as const;
-
-export const CATEGORIES = [
-  'Electronics',
-  'Home & Garden',
-  'Sporting Goods',
-  'Toys & Games',
-  'Other'
-] as const;
-
