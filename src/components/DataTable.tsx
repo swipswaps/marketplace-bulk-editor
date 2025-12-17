@@ -574,9 +574,10 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
                   }}
                 >
                   {editingCell?.id === listing.id && editingCell?.field === 'PRICE' ? (
+                    <>
                     <input
                       type="text"
-                      list="price-suggestions"
+                      list={`price-suggestions-${uniquePrices.length}`}
                       value={listing.PRICE}
                       onChange={(e) => {
                         const value = e.target.value;
@@ -610,6 +611,12 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
                       autoComplete="off"
                       autoFocus
                     />
+                    <datalist id={`price-suggestions-${uniquePrices.length}`}>
+                      {uniquePrices.map((price, index) => (
+                        <option key={index} value={String(price)} />
+                      ))}
+                    </datalist>
+                    </>
                   ) : (
                     <div>${typeof listing.PRICE === 'number' ? listing.PRICE.toFixed(2) : listing.PRICE}</div>
                   )}
@@ -795,12 +802,6 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
       <datalist id="category-suggestions">
         {uniqueCategories.map((category, index) => (
           <option key={index} value={category} />
-        ))}
-      </datalist>
-
-      <datalist id="price-suggestions" key={uniquePrices.join(',')}>
-        {uniquePrices.map((price, index) => (
-          <option key={index} value={String(price)} />
         ))}
       </datalist>
     </div>
