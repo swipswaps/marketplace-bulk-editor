@@ -53,6 +53,13 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
     new Set(data.map(item => item.DESCRIPTION).filter(desc => desc && desc.trim() !== ''))
   ).sort();
 
+  const uniquePrices = Array.from(
+    new Set(data.map(item => {
+      const price = typeof item.PRICE === 'number' ? item.PRICE : parseFloat(item.PRICE);
+      return !isNaN(price) && price > 0 ? price : null;
+    }).filter(price => price !== null))
+  ).sort((a, b) => (a as number) - (b as number));
+
   // Handle column resizing with mouse events
   useEffect(() => {
     if (!resizing) return;
@@ -778,26 +785,9 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
       </datalist>
 
       <datalist id="price-suggestions">
-        <option value="5" />
-        <option value="10" />
-        <option value="15" />
-        <option value="20" />
-        <option value="25" />
-        <option value="30" />
-        <option value="40" />
-        <option value="50" />
-        <option value="75" />
-        <option value="100" />
-        <option value="150" />
-        <option value="200" />
-        <option value="250" />
-        <option value="300" />
-        <option value="400" />
-        <option value="500" />
-        <option value="750" />
-        <option value="1000" />
-        <option value="1500" />
-        <option value="2000" />
+        {uniquePrices.map((price, index) => (
+          <option key={index} value={price as number} />
+        ))}
       </datalist>
     </div>
   );
