@@ -28,7 +28,7 @@ export function ExportButton({ data, sortField, sortDirection }: ExportButtonPro
         if (aVal === bVal) return 0;
 
         const comparison = aVal < bVal ? -1 : 1;
-        return sortDirection === 'asc' ? comparison : -comparison;
+        return sortDirection === 'asc' ? -comparison : comparison; // Inverted to match table display
       });
     }
 
