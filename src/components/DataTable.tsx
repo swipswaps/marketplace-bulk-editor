@@ -28,6 +28,7 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
   });
   const [showColumnMenu, setShowColumnMenu] = useState(false);
   const [focusedCell, setFocusedCell] = useState<{ id: string; field: keyof MarketplaceListing } | null>(null);
+  const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
     TITLE: 250,
     PRICE: 100,
@@ -152,6 +153,41 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
     }
   };
 
+  const handleSelectAll = () => {
+    if (selectedRows.size === sortedData.length) {
+      setSelectedRows(new Set());
+    } else {
+      setSelectedRows(new Set(sortedData.map(item => item.id)));
+    }
+  };
+
+  const handleBulkDelete = () => {
+    if (selectedRows.size === 0) return;
+
+    if (confirm(`Delete ${selectedRows.size} selected listing(s)?`)) {
+      const updatedData = data.filter(item => !selectedRows.has(item.id));
+      onUpdate(updatedData);
+      setSelectedRows(new Set());
+
+      // Show save indicator
+      setLastSaved(new Date().toLocaleTimeString());
+      setTimeout(() => setLastSaved(null), 2000);
+    }
+  };
+
+  const handleBulkEdit = (field: keyof MarketplaceListing, value: any) => {
+    if (selectedRows.size === 0) return;
+
+    const updatedData = data.map(item =>
+      selectedRows.has(item.id) ? { ...item, [field]: value } : item
+    );
+    onUpdate(updatedData);
+
+    // Show save indicator
+    setLastSaved(new Date().toLocaleTimeString());
+    setTimeout(() => setLastSaved(null), 2000);
+  };
+
   const handleAdd = () => {
     const newListing: MarketplaceListing = {
       id: crypto.randomUUID(),
@@ -261,6 +297,46 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
             Add New Listing
           </button>
 
+          {/* Bulk Actions */}
+          {selectedRows.size > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-600 dark:text-gray-400 font-medium">
+                {selectedRows.size} selected
+              </span>
+              <button
+                onClick={handleBulkDelete}
+                className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 transition-colors"
+              >
+                <Trash2 size={14} />
+                Delete
+              </button>
+              <select
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value === 'New' || value === 'Used - Like New' || value === 'Used - Good' || value === 'Used - Fair') {
+                    handleBulkEdit('CONDITION', value);
+                  } else if (value === 'Yes' || value === 'No') {
+                    handleBulkEdit('OFFER SHIPPING', value);
+                  }
+                  e.target.value = '';
+                }}
+                className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Bulk Edit...</option>
+                <optgroup label="Condition">
+                  <option value="New">Set to New</option>
+                  <option value="Used - Like New">Set to Used - Like New</option>
+                  <option value="Used - Good">Set to Used - Good</option>
+                  <option value="Used - Fair">Set to Used - Fair</option>
+                </optgroup>
+                <optgroup label="Shipping">
+                  <option value="Yes">Offer Shipping: Yes</option>
+                  <option value="No">Offer Shipping: No</option>
+                </optgroup>
+              </select>
+            </div>
+          )}
+
           {/* Search box */}
           <div className="flex-1 max-w-md">
             <input
@@ -331,6 +407,7 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
       <div className="overflow-x-auto">
         <table ref={tableRef} className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-sm" style={{ tableLayout: 'fixed', width: '100%' }}>
           <colgroup>
+            <col style={{ width: '50px' }} />
             {[
               { field: 'TITLE' as keyof MarketplaceListing },
               { field: 'PRICE' as keyof MarketplaceListing },
@@ -345,6 +422,14 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
           </colgroup>
           <thead className="bg-gray-100 dark:bg-gray-700 sticky top-0 z-10">
             <tr>
+              <th className="px-4 py-3 text-left font-medium text-gray-900 dark:text-gray-100 border-b dark:border-gray-600">
+                <input
+                  type="checkbox"
+                  checked={selectedRows.size === sortedData.length && sortedData.length > 0}
+                  onChange={handleSelectAll}
+                  className="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
+                />
+              </th>
               {[
                 { field: 'TITLE' as keyof MarketplaceListing, label: 'Title' },
                 { field: 'PRICE' as keyof MarketplaceListing, label: 'Price' },
@@ -413,6 +498,24 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
           <tbody>
             {sortedData.map((listing) => (
               <tr key={listing.id} className="hover:bg-blue-50 dark:hover:bg-gray-700 hover:shadow-sm transition-colors">
+                {/* Checkbox */}
+                <td className="px-4 py-2 border-b dark:border-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={selectedRows.has(listing.id)}
+                    onChange={(e) => {
+                      const newSelected = new Set(selectedRows);
+                      if (e.target.checked) {
+                        newSelected.add(listing.id);
+                      } else {
+                        newSelected.delete(listing.id);
+                      }
+                      setSelectedRows(newSelected);
+                    }}
+                    className="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
+                  />
+                </td>
+
                 {/* Title */}
                 {visibleColumns.TITLE && <td
                   className={`px-4 py-2 border-b dark:border-gray-700 cursor-text text-gray-900 dark:text-gray-100 ${
