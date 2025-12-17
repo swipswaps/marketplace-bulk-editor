@@ -44,10 +44,11 @@ export function ExportButton({ data }: ExportButtonProps) {
     <button
       onClick={handleExport}
       disabled={data.length === 0}
-      className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+      className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-white/20 backdrop-blur-sm text-white rounded-lg hover:bg-white/30 disabled:bg-white/10 disabled:cursor-not-allowed transition-all text-sm sm:text-base"
     >
-      <Download size={20} />
-      Download Excel
+      <Download size={18} />
+      <span className="hidden sm:inline">Download Excel</span>
+      <span className="sm:hidden">Download</span>
     </button>
   );
 }
