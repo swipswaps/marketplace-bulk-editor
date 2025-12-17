@@ -88,20 +88,20 @@ export function FileUpload({ onDataLoaded }: FileUploadProps) {
       {...getRootProps()}
       className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
         isDragActive
-          ? 'border-blue-500 bg-blue-50'
-          : 'border-gray-300 bg-white hover:border-gray-400'
+          ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+          : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 hover:border-gray-400 dark:hover:border-gray-500'
       }`}
     >
       <input {...getInputProps()} />
-      <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+      <Upload className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-500 mb-4" />
       {isDragActive ? (
-        <p className="text-lg text-blue-600">Drop the files here...</p>
+        <p className="text-lg text-blue-600 dark:text-blue-400">Drop the files here...</p>
       ) : (
         <div>
-          <p className="text-lg text-gray-700 mb-2">
+          <p className="text-lg text-gray-700 dark:text-gray-300 mb-2">
             Drag & drop Excel files here, or click to select
           </p>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-gray-500 dark:text-gray-400">
             Supports .xlsx, .xls, and .csv files
           </p>
         </div>

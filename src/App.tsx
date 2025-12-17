@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { FileUpload } from './components/FileUpload';
 import { DataTable } from './components/DataTable';
 import { ExportButton } from './components/ExportButton';
+import { Moon, Sun } from 'lucide-react';
 import type { MarketplaceListing } from './types';
 import { FileSpreadsheet, Trash2 } from 'lucide-react';
 
@@ -12,6 +13,20 @@ function App() {
   const [listings, setListings] = useState<MarketplaceListing[]>([]);
   const [sortField, setSortField] = useState<SortField>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>(null);
+  const [darkMode, setDarkMode] = useState<boolean>(() => {
+    const saved = localStorage.getItem('darkMode');
+    return saved ? JSON.parse(saved) : false;
+  });
+
+  // Apply dark mode class to document
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+    localStorage.setItem('darkMode', JSON.stringify(darkMode));
+  }, [darkMode]);
 
   const handleDataLoaded = (newData: MarketplaceListing[]) => {
     // Merge with existing data
@@ -25,31 +40,42 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50">
+    <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-900 transition-colors">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
+      <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-10 transition-colors">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="bg-blue-600 p-2 rounded-lg text-white">
+            <div className="bg-blue-600 dark:bg-blue-500 p-2 rounded-lg text-white">
               <FileSpreadsheet size={20} />
             </div>
-            <h1 className="text-xl font-bold text-gray-900 tracking-tight">
+            <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100 tracking-tight">
               Marketplace Bulk Editor
             </h1>
           </div>
 
-          {listings.length > 0 && (
-            <div className="flex items-center gap-3">
-              <button
-                onClick={handleClearAll}
-                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
-              >
-                <Trash2 size={16} />
-                Clear All
-              </button>
-              <ExportButton data={listings} sortField={sortField} sortDirection={sortDirection} />
-            </div>
-          )}
+          <div className="flex items-center gap-3">
+            {/* Dark Mode Toggle */}
+            <button
+              onClick={() => setDarkMode(!darkMode)}
+              className="p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+            >
+              {darkMode ? <Sun size={20} /> : <Moon size={20} />}
+            </button>
+
+            {listings.length > 0 && (
+              <>
+                <button
+                  onClick={handleClearAll}
+                  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+                >
+                  <Trash2 size={16} />
+                  Clear All
+                </button>
+                <ExportButton data={listings} sortField={sortField} sortDirection={sortDirection} />
+              </>
+            )}
+          </div>
         </div>
       </header>
 

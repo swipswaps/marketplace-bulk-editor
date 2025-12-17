@@ -81,18 +81,18 @@ export function ExportButton({ data, sortField, sortDirection }: ExportButtonPro
       {/* Preview Modal */}
       {showPreview && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] flex flex-col">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] flex flex-col">
             {/* Header */}
-            <div className="flex items-center justify-between p-6 border-b">
+            <div className="flex items-center justify-between p-6 border-b dark:border-gray-700">
               <div>
-                <h2 className="text-xl font-semibold text-gray-900">Export Preview</h2>
-                <p className="text-sm text-gray-500 mt-1">
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Export Preview</h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                   Showing first 10 of {data.length} listings • {sortField ? `Sorted by ${sortField} (${sortDirection})` : 'Original order'}
                 </p>
               </div>
               <button
                 onClick={() => setShowPreview(false)}
-                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors text-gray-700 dark:text-gray-300"
               >
                 <X size={20} />
               </button>
@@ -100,26 +100,26 @@ export function ExportButton({ data, sortField, sortDirection }: ExportButtonPro
 
             {/* Preview Table */}
             <div className="flex-1 overflow-auto p-6">
-              <table className="w-full border border-gray-300 text-sm">
-                <thead className="bg-gray-100">
+              <table className="w-full border border-gray-300 dark:border-gray-700 text-sm">
+                <thead className="bg-gray-100 dark:bg-gray-700">
                   <tr>
-                    <th className="border px-3 py-2 text-left font-medium">TITLE</th>
-                    <th className="border px-3 py-2 text-left font-medium">PRICE</th>
-                    <th className="border px-3 py-2 text-left font-medium">CONDITION</th>
-                    <th className="border px-3 py-2 text-left font-medium">DESCRIPTION</th>
-                    <th className="border px-3 py-2 text-left font-medium">CATEGORY</th>
-                    <th className="border px-3 py-2 text-left font-medium">OFFER SHIPPING</th>
+                    <th className="border dark:border-gray-600 px-3 py-2 text-left font-medium text-gray-900 dark:text-gray-100">TITLE</th>
+                    <th className="border dark:border-gray-600 px-3 py-2 text-left font-medium text-gray-900 dark:text-gray-100">PRICE</th>
+                    <th className="border dark:border-gray-600 px-3 py-2 text-left font-medium text-gray-900 dark:text-gray-100">CONDITION</th>
+                    <th className="border dark:border-gray-600 px-3 py-2 text-left font-medium text-gray-900 dark:text-gray-100">DESCRIPTION</th>
+                    <th className="border dark:border-gray-600 px-3 py-2 text-left font-medium text-gray-900 dark:text-gray-100">CATEGORY</th>
+                    <th className="border dark:border-gray-600 px-3 py-2 text-left font-medium text-gray-900 dark:text-gray-100">OFFER SHIPPING</th>
                   </tr>
                 </thead>
                 <tbody>
                   {getSortedData().slice(0, 10).map((listing, idx) => (
-                    <tr key={idx} className="hover:bg-gray-50">
-                      <td className="border px-3 py-2">{listing.TITLE}</td>
-                      <td className="border px-3 py-2">${listing.PRICE}</td>
-                      <td className="border px-3 py-2">{listing.CONDITION}</td>
-                      <td className="border px-3 py-2 max-w-xs truncate">{listing.DESCRIPTION}</td>
-                      <td className="border px-3 py-2">{listing.CATEGORY}</td>
-                      <td className="border px-3 py-2">{listing['OFFER SHIPPING']}</td>
+                    <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                      <td className="border dark:border-gray-700 px-3 py-2 text-gray-900 dark:text-gray-100">{listing.TITLE}</td>
+                      <td className="border dark:border-gray-700 px-3 py-2 text-gray-900 dark:text-gray-100">${listing.PRICE}</td>
+                      <td className="border dark:border-gray-700 px-3 py-2 text-gray-900 dark:text-gray-100">{listing.CONDITION}</td>
+                      <td className="border dark:border-gray-700 px-3 py-2 max-w-xs truncate text-gray-900 dark:text-gray-100">{listing.DESCRIPTION}</td>
+                      <td className="border dark:border-gray-700 px-3 py-2 text-gray-900 dark:text-gray-100">{listing.CATEGORY}</td>
+                      <td className="border dark:border-gray-700 px-3 py-2 text-gray-900 dark:text-gray-100">{listing['OFFER SHIPPING']}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -127,10 +127,10 @@ export function ExportButton({ data, sortField, sortDirection }: ExportButtonPro
             </div>
 
             {/* Footer */}
-            <div className="flex items-center justify-end gap-3 p-6 border-t bg-gray-50">
+            <div className="flex items-center justify-end gap-3 p-6 border-t dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
               <button
                 onClick={() => setShowPreview(false)}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
               >
                 Cancel
               </button>

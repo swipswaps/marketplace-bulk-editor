@@ -213,7 +213,7 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
               placeholder="Search listings..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
             />
           </div>
 
@@ -221,19 +221,19 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
           <div className="relative">
             <button
               onClick={() => setShowColumnMenu(!showColumnMenu)}
-              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
             >
               <Eye size={16} />
               Columns
             </button>
 
             {showColumnMenu && (
-              <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-20">
+              <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg z-20">
                 <div className="p-2">
                   {Object.keys(visibleColumns).map((col) => {
                     const column = col as keyof MarketplaceListing;
                     return (
-                      <label key={column} className="flex items-center gap-2 px-2 py-1.5 hover:bg-gray-50 rounded cursor-pointer">
+                      <label key={column} className="flex items-center gap-2 px-2 py-1.5 hover:bg-gray-50 dark:hover:bg-gray-700 rounded cursor-pointer">
                         <input
                           type="checkbox"
                           checked={visibleColumns[column]}
@@ -243,9 +243,9 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
                               [column]: e.target.checked
                             }));
                           }}
-                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          className="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
                         />
-                        <span className="text-sm text-gray-700">{column}</span>
+                        <span className="text-sm text-gray-700 dark:text-gray-300">{column}</span>
                       </label>
                     );
                   })}
@@ -256,7 +256,7 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
 
           {/* Results count */}
           {searchQuery && (
-            <div className="text-sm text-gray-600">
+            <div className="text-sm text-gray-600 dark:text-gray-400">
               {filteredData.length} of {data.length} listings
             </div>
           )}
@@ -274,7 +274,7 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
       </div>
 
       <div className="overflow-x-auto">
-        <table ref={tableRef} className="bg-white border border-gray-300 text-sm" style={{ tableLayout: 'fixed', width: '100%' }}>
+        <table ref={tableRef} className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-sm" style={{ tableLayout: 'fixed', width: '100%' }}>
           <colgroup>
             {[
               { field: 'TITLE' as keyof MarketplaceListing },
@@ -288,7 +288,7 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
             ))}
             <col style={{ width: '100px' }} />
           </colgroup>
-          <thead className="bg-gray-100 sticky top-0 z-10">
+          <thead className="bg-gray-100 dark:bg-gray-700 sticky top-0 z-10">
             <tr>
               {[
                 { field: 'TITLE' as keyof MarketplaceListing, label: 'Title' },
@@ -300,8 +300,8 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
               ].filter(({ field }) => visibleColumns[field]).map(({ field, label }, colIndex) => (
                 <th
                   key={field}
-                  className={`border-b text-left font-medium select-none ${
-                    sortField === field ? 'bg-blue-100 text-blue-900' : 'text-gray-700'
+                  className={`border-b dark:border-gray-600 text-left font-medium select-none ${
+                    sortField === field ? 'bg-blue-100 dark:bg-blue-900 text-blue-900 dark:text-blue-100' : 'text-gray-700 dark:text-gray-300'
                   }`}
                   style={{ position: 'relative', padding: 0 }}
                 >
@@ -357,10 +357,10 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
           </thead>
           <tbody>
             {sortedData.map((listing) => (
-              <tr key={listing.id} className="hover:bg-blue-50 hover:shadow-sm transition-colors">
+              <tr key={listing.id} className="hover:bg-blue-50 dark:hover:bg-gray-700 hover:shadow-sm transition-colors">
                 {/* Title */}
                 {visibleColumns.TITLE && <td
-                  className="px-4 py-2 border-b cursor-text"
+                  className="px-4 py-2 border-b dark:border-gray-700 cursor-text text-gray-900 dark:text-gray-100"
                   onClick={() => setEditingCell({ id: listing.id, field: 'TITLE' })}
                 >
                   {editingCell?.id === listing.id && editingCell?.field === 'TITLE' ? (
@@ -379,22 +379,22 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
                           }
                         }}
                         maxLength={150}
-                        className="w-full px-2 py-1 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        className="w-full px-2 py-1 border dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         autoComplete="off"
                         autoFocus
                       />
-                      <div className="text-xs text-gray-500 mt-1">
+                      <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                         {listing.TITLE.length}/150 characters
                       </div>
                     </div>
                   ) : (
-                    <div className="truncate" title={listing.TITLE}>{listing.TITLE || <span className="text-gray-400">Click to edit</span>}</div>
+                    <div className="truncate" title={listing.TITLE}>{listing.TITLE || <span className="text-gray-400 dark:text-gray-500">Click to edit</span>}</div>
                   )}
                 </td>}
 
                 {/* Price */}
                 {visibleColumns.PRICE && <td
-                  className="px-4 py-2 border-b cursor-text"
+                  className="px-4 py-2 border-b dark:border-gray-700 cursor-text text-gray-900 dark:text-gray-100"
                   onClick={() => setEditingCell({ id: listing.id, field: 'PRICE' })}
                 >
                   {editingCell?.id === listing.id && editingCell?.field === 'PRICE' ? (
@@ -410,7 +410,7 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
                           setEditingCell(null);
                         }
                       }}
-                      className="w-full px-2 py-1 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-2 py-1 border dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       autoFocus
                     />
                   ) : (
@@ -420,7 +420,7 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
 
                 {/* Condition */}
                 {visibleColumns.CONDITION && <td
-                  className="px-4 py-2 border-b cursor-pointer"
+                  className="px-4 py-2 border-b dark:border-gray-700 cursor-pointer text-gray-900 dark:text-gray-100"
                   onClick={() => setEditingCell({ id: listing.id, field: 'CONDITION' })}
                 >
                   {editingCell?.id === listing.id && editingCell?.field === 'CONDITION' ? (
@@ -431,7 +431,7 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
                         setEditingCell(null);
                       }}
                       onBlur={() => setEditingCell(null)}
-                      className="w-full px-2 py-1 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-2 py-1 border dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       autoFocus
                     >
                       {CONDITIONS.map(cond => (
@@ -445,7 +445,7 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
 
                 {/* Description */}
                 {visibleColumns.DESCRIPTION && <td
-                  className="px-4 py-2 border-b cursor-text"
+                  className="px-4 py-2 border-b dark:border-gray-700 cursor-text text-gray-900 dark:text-gray-100"
                   onClick={() => setEditingCell({ id: listing.id, field: 'DESCRIPTION' })}
                 >
                   {editingCell?.id === listing.id && editingCell?.field === 'DESCRIPTION' ? (
@@ -469,7 +469,7 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
                           }
                         }}
                         maxLength={5000}
-                        className="w-full px-2 py-1 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none overflow-hidden"
+                        className="w-full px-2 py-1 border dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none overflow-hidden"
                         style={{ minHeight: '60px' }}
                         autoComplete="off"
                         autoFocus
@@ -486,13 +486,13 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
                       </datalist>
                     </>
                   ) : (
-                    <div className="whitespace-pre-wrap" title={listing.DESCRIPTION}>{listing.DESCRIPTION || <span className="text-gray-400">Click to edit</span>}</div>
+                    <div className="whitespace-pre-wrap" title={listing.DESCRIPTION}>{listing.DESCRIPTION || <span className="text-gray-400 dark:text-gray-500">Click to edit</span>}</div>
                   )}
                 </td>}
 
                 {/* Category */}
                 {visibleColumns.CATEGORY && <td
-                  className="px-4 py-2 border-b cursor-text"
+                  className="px-4 py-2 border-b dark:border-gray-700 cursor-text text-gray-900 dark:text-gray-100"
                   onClick={() => setEditingCell({ id: listing.id, field: 'CATEGORY' })}
                 >
                   {editingCell?.id === listing.id && editingCell?.field === 'CATEGORY' ? (
@@ -509,19 +509,19 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
                           setEditingCell(null);
                         }
                       }}
-                      className="w-full px-2 py-1 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-2 py-1 border dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       placeholder="e.g. Home & Garden"
                       autoComplete="off"
                       autoFocus
                     />
                   ) : (
-                    <div className="truncate" title={listing.CATEGORY}>{listing.CATEGORY || <span className="text-gray-400">Click to edit</span>}</div>
+                    <div className="truncate" title={listing.CATEGORY}>{listing.CATEGORY || <span className="text-gray-400 dark:text-gray-500">Click to edit</span>}</div>
                   )}
                 </td>}
 
                 {/* Offer Shipping */}
                 {visibleColumns['OFFER SHIPPING'] && <td
-                  className="px-4 py-2 border-b cursor-pointer"
+                  className="px-4 py-2 border-b dark:border-gray-700 cursor-pointer text-gray-900 dark:text-gray-100"
                   onClick={() => setEditingCell({ id: listing.id, field: 'OFFER SHIPPING' })}
                 >
                   {editingCell?.id === listing.id && editingCell?.field === 'OFFER SHIPPING' ? (
@@ -532,7 +532,7 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
                         setEditingCell(null);
                       }}
                       onBlur={() => setEditingCell(null)}
-                      className="w-full px-2 py-1 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-2 py-1 border dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       autoFocus
                     >
                       <option value="Yes">Yes</option>
