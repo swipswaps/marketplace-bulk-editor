@@ -265,18 +265,34 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
               {readmeContent && !readmeLoading && (
                 <div className="prose prose-sm dark:prose-invert max-w-none
-                  prose-headings:text-gray-900 dark:prose-headings:text-white
-                  prose-p:text-gray-700 dark:prose-p:text-gray-300
-                  prose-a:text-blue-600 dark:prose-a:text-blue-400
-                  prose-strong:text-gray-900 dark:prose-strong:text-white
-                  prose-code:text-gray-900 dark:prose-code:text-white
-                  prose-code:bg-gray-100 dark:prose-code:bg-gray-800
-                  prose-pre:bg-gray-100 dark:prose-pre:bg-gray-800
-                  prose-li:text-gray-700 dark:prose-li:text-gray-300
-                  prose-ul:text-gray-700 dark:prose-ul:text-gray-300
-                  prose-ol:text-gray-700 dark:prose-ol:text-gray-300
+                  prose-headings:font-bold
+                  prose-h1:text-3xl prose-h1:mb-4 prose-h1:mt-6
+                  prose-h2:text-2xl prose-h2:mb-3 prose-h2:mt-5 prose-h2:border-b prose-h2:border-gray-200 dark:prose-h2:border-gray-700 prose-h2:pb-2
+                  prose-h3:text-xl prose-h3:mb-2 prose-h3:mt-4
+                  prose-h4:text-lg prose-h4:mb-2 prose-h4:mt-3
+                  prose-p:leading-relaxed prose-p:mb-4
+                  prose-a:text-blue-600 dark:prose-a:text-blue-400 prose-a:no-underline hover:prose-a:underline
+                  prose-strong:font-semibold
+                  prose-code:text-sm prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:bg-gray-100 dark:prose-code:bg-gray-800 prose-code:text-pink-600 dark:prose-code:text-pink-400 prose-code:before:content-none prose-code:after:content-none
+                  prose-pre:bg-gray-100 dark:prose-pre:bg-gray-800 prose-pre:border prose-pre:border-gray-200 dark:prose-pre:border-gray-700 prose-pre:rounded-lg prose-pre:p-4
+                  prose-ul:my-4 prose-ul:list-disc prose-ul:pl-6
+                  prose-ol:my-4 prose-ol:list-decimal prose-ol:pl-6
+                  prose-li:my-1
+                  prose-blockquote:border-l-4 prose-blockquote:border-gray-300 dark:prose-blockquote:border-gray-600 prose-blockquote:pl-4 prose-blockquote:italic
+                  prose-hr:border-gray-200 dark:prose-hr:border-gray-700 prose-hr:my-8
+                  prose-table:border-collapse prose-table:w-full
+                  prose-th:border prose-th:border-gray-300 dark:prose-th:border-gray-600 prose-th:bg-gray-100 dark:prose-th:bg-gray-800 prose-th:px-4 prose-th:py-2 prose-th:text-left
+                  prose-td:border prose-td:border-gray-300 dark:prose-td:border-gray-600 prose-td:px-4 prose-td:py-2
+                  prose-img:rounded-lg prose-img:shadow-md
                 ">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    components={{
+                      a: ({ node, ...props }) => (
+                        <a {...props} target="_blank" rel="noopener noreferrer" />
+                      ),
+                    }}
+                  >
                     {readmeContent}
                   </ReactMarkdown>
                 </div>
