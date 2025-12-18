@@ -53,6 +53,7 @@ function App() {
   const handleDataLoaded = (newData: MarketplaceListing[]) => {
     // Merge with existing data
     const updatedListings = [...listings, ...newData];
+    console.log(`📊 Data loaded: ${newData.length} new listings + ${listings.length} existing = ${updatedListings.length} total`);
     updateListingsWithHistory(updatedListings);
   };
 

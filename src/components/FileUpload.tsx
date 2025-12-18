@@ -19,7 +19,31 @@ export function FileUpload({ onDataLoaded }: FileUploadProps) {
           const workbook = XLSX.read(data, { type: 'binary' });
           const sheetName = workbook.SheetNames[0];
           const worksheet = workbook.Sheets[sheetName];
-          const jsonData = XLSX.utils.sheet_to_json(worksheet) as Record<string, string | number>[];
+
+          // Find the header row by looking for TITLE, PRICE, DESCRIPTION columns
+          const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
+          let headerRowIndex = 0;
+
+          for (let row = range.s.r; row <= Math.min(range.s.r + 10, range.e.r); row++) {
+            const rowData: string[] = [];
+            for (let col = range.s.c; col <= range.e.c; col++) {
+              const cellAddress = XLSX.utils.encode_cell({ r: row, c: col });
+              const cell = worksheet[cellAddress];
+              rowData.push(cell ? String(cell.v).toUpperCase() : '');
+            }
+
+            const rowText = rowData.join('|');
+            if (rowText.includes('TITLE') && rowText.includes('PRICE') && rowText.includes('DESCRIPTION')) {
+              headerRowIndex = row;
+              break;
+            }
+          }
+
+          // Parse data starting from the header row
+          const jsonData = XLSX.utils.sheet_to_json(worksheet, {
+            range: headerRowIndex,
+            defval: ''
+          }) as Record<string, string | number>[];
 
           // Validation warnings
           const warnings: string[] = [];
@@ -61,8 +85,11 @@ export function FileUpload({ onDataLoaded }: FileUploadProps) {
 
           // Show warnings if any
           if (warnings.length > 0) {
-            const warningMsg = `⚠️ Import completed with warnings:\n\n${warnings.join('\n')}\n\nPlease review and fix these issues before exporting.`;
+            const warningMsg = `⚠️ Import completed with warnings:\n\n${warnings.join('\n')}\n\nAdded ${listings.length} listing(s) from ${file.name}\n\nPlease review and fix these issues before exporting.`;
             alert(warningMsg);
+          } else {
+            // Show success message
+            console.log(`✅ Successfully imported ${listings.length} listing(s) from ${file.name}`);
           }
 
           onDataLoaded(listings);
