@@ -62,6 +62,18 @@ function App() {
     }
   };
 
+  const handleTemplateDetected = (template: TemplateMetadata, _sampleData: MarketplaceListing[]) => {
+    // Save the template structure
+    setTemplate(template);
+
+    // Show settings modal on first template detection
+    if (!hasUploadedFile) {
+      setHasUploadedFile(true);
+      localStorage.setItem('hasUploadedFile', 'true');
+      setShowSettings(true);
+    }
+  };
+
   const handleDataLoaded = (newData: MarketplaceListing[]) => {
     // Merge with existing data
     const updatedListings = [...listings, ...newData];
@@ -216,7 +228,10 @@ function App() {
 
           {/* File Upload Section */}
           <div className="mb-8">
-            <FileUpload onDataLoaded={handleDataLoaded} />
+            <FileUpload
+              onDataLoaded={handleDataLoaded}
+              onTemplateDetected={handleTemplateDetected}
+            />
           </div>
 
           {/* Data Table Section */}
