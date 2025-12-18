@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Trash2, Plus, ArrowUpDown, ArrowUp, ArrowDown, Copy, Eye } from 'lucide-react';
+import { Trash2, Plus, ArrowUpDown, ArrowUp, ArrowDown, Copy, Eye, MoreVertical } from 'lucide-react';
 import type { MarketplaceListing } from '../types';
 import { CONDITIONS } from '../types';
 
@@ -33,6 +33,13 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
   const [showColumnMenu, setShowColumnMenu] = useState(false);
   const [focusedCell, setFocusedCell] = useState<{ id: string; field: keyof MarketplaceListing } | null>(null);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
+  const [columnActionMenu, setColumnActionMenu] = useState<keyof MarketplaceListing | null>(null);
+  const [bulkEditModal, setBulkEditModal] = useState<{
+    show: boolean;
+    field: keyof MarketplaceListing | null;
+    scope: 'all' | 'selected';
+    value: string;
+  }>({ show: false, field: null, scope: 'all', value: '' });
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
     TITLE: 250,
     PRICE: 100,
@@ -226,6 +233,63 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
     onUpdate([...data, newListing]);
   };
 
+  const handleColumnBulkEdit = (field: keyof MarketplaceListing, scope: 'all' | 'selected') => {
+    // Open modal for text/number fields
+    if (field === 'TITLE' || field === 'DESCRIPTION' || field === 'CATEGORY' || field === 'PRICE') {
+      setBulkEditModal({ show: true, field, scope, value: '' });
+    }
+    setColumnActionMenu(null);
+  };
+
+  const handleApplyBulkEdit = () => {
+    if (!bulkEditModal.field) return;
+
+    const { field, scope, value } = bulkEditModal;
+
+    let updatedData: MarketplaceListing[];
+    if (scope === 'all') {
+      updatedData = data.map(item => ({ ...item, [field]: field === 'PRICE' ? Number(value) || 0 : value }));
+    } else {
+      updatedData = data.map(item =>
+        selectedRows.has(item.id) ? { ...item, [field]: field === 'PRICE' ? Number(value) || 0 : value } : item
+      );
+    }
+
+    onUpdate(updatedData);
+    setBulkEditModal({ show: false, field: null, scope: 'all', value: '' });
+
+    // Show save indicator
+    setLastSaved(new Date().toLocaleTimeString());
+    setTimeout(() => setLastSaved(null), 2000);
+  };
+
+  const handleClearColumn = (field: keyof MarketplaceListing, scope: 'all' | 'selected') => {
+    const defaultValue = field === 'PRICE' ? 0 : '';
+
+    let updatedData: MarketplaceListing[];
+    if (scope === 'all') {
+      if (confirm(`Clear all values in ${field} column?`)) {
+        updatedData = data.map(item => ({ ...item, [field]: defaultValue }));
+        onUpdate(updatedData);
+      }
+    } else {
+      if (selectedRows.size === 0) {
+        alert('No rows selected');
+        return;
+      }
+      if (confirm(`Clear ${field} for ${selectedRows.size} selected row(s)?`)) {
+        updatedData = data.map(item =>
+          selectedRows.has(item.id) ? { ...item, [field]: defaultValue } : item
+        );
+        onUpdate(updatedData);
+      }
+    }
+
+    setColumnActionMenu(null);
+    setLastSaved(new Date().toLocaleTimeString());
+    setTimeout(() => setLastSaved(null), 2000);
+  };
+
   // Sort data
   // Filter data based on search query
   const filteredData = data.filter((listing) => {
@@ -254,6 +318,20 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
     const comparison = aVal < bVal ? -1 : 1;
     return sortDirection === 'asc' ? comparison : -comparison;
   });
+
+  // Close column action menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (columnActionMenu) {
+        setColumnActionMenu(null);
+      }
+    };
+
+    if (columnActionMenu) {
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [columnActionMenu]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -473,7 +551,7 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
                   <div style={{ display: 'flex', alignItems: 'stretch' }}>
                     {/* Sortable header content */}
                     <div
-                      className={`flex items-center gap-2 cursor-pointer px-4 py-2 ${
+                      className={`flex items-center gap-1 cursor-pointer px-4 py-2 ${
                         sortField === field ? 'font-semibold' : 'hover:text-blue-600'
                       }`}
                       style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}
@@ -490,6 +568,71 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
                         <ArrowUpDown size={14} className="text-gray-400 flex-shrink-0" />
                       )}
                     </div>
+
+                    {/* Column Action Menu Button */}
+                    <div className="relative flex items-center px-1">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setColumnActionMenu(columnActionMenu === field ? null : field);
+                        }}
+                        className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition-colors"
+                        title="Column actions"
+                      >
+                        <MoreVertical size={14} className="text-gray-500 dark:text-gray-400" />
+                      </button>
+
+                      {/* Dropdown Menu */}
+                      {columnActionMenu === field && (
+                        <div className="absolute top-full right-0 mt-1 w-56 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg z-50">
+                          <div className="py-1">
+                            {/* Edit All Rows */}
+                            {(field === 'TITLE' || field === 'DESCRIPTION' || field === 'CATEGORY' || field === 'PRICE') && (
+                              <button
+                                onClick={() => handleColumnBulkEdit(field, 'all')}
+                                className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                              >
+                                Edit all rows...
+                              </button>
+                            )}
+
+                            {/* Edit Selected Rows */}
+                            {(field === 'TITLE' || field === 'DESCRIPTION' || field === 'CATEGORY' || field === 'PRICE') && (
+                              <button
+                                onClick={() => handleColumnBulkEdit(field, 'selected')}
+                                className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                disabled={selectedRows.size === 0}
+                              >
+                                Edit selected rows... {selectedRows.size > 0 && `(${selectedRows.size})`}
+                              </button>
+                            )}
+
+                            {/* Divider */}
+                            {(field === 'TITLE' || field === 'DESCRIPTION' || field === 'CATEGORY' || field === 'PRICE') && (
+                              <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
+                            )}
+
+                            {/* Clear All */}
+                            <button
+                              onClick={() => handleClearColumn(field, 'all')}
+                              className="w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+                            >
+                              Clear all values
+                            </button>
+
+                            {/* Clear Selected */}
+                            <button
+                              onClick={() => handleClearColumn(field, 'selected')}
+                              className="w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+                              disabled={selectedRows.size === 0}
+                            >
+                              Clear selected {selectedRows.size > 0 && `(${selectedRows.size})`}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
                     {/* Resize handle - separate from sort area */}
                     <div
                       className="cursor-col-resize hover:bg-blue-300"
@@ -833,6 +976,69 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
       </datalist>
 
 
+
+      {/* Bulk Edit Modal */}
+      {bulkEditModal.show && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div className="p-6">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                Bulk Edit: {bulkEditModal.field}
+              </h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                {bulkEditModal.scope === 'all'
+                  ? `This will update all ${data.length} rows`
+                  : `This will update ${selectedRows.size} selected row(s)`
+                }
+              </p>
+
+              {bulkEditModal.field === 'PRICE' ? (
+                <input
+                  type="number"
+                  value={bulkEditModal.value}
+                  onChange={(e) => setBulkEditModal({ ...bulkEditModal, value: e.target.value })}
+                  placeholder="Enter price"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md focus:ring-2 focus:ring-blue-500"
+                  autoFocus
+                />
+              ) : bulkEditModal.field === 'DESCRIPTION' ? (
+                <textarea
+                  value={bulkEditModal.value}
+                  onChange={(e) => setBulkEditModal({ ...bulkEditModal, value: e.target.value })}
+                  placeholder={`Enter ${bulkEditModal.field?.toLowerCase()}`}
+                  rows={4}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md focus:ring-2 focus:ring-blue-500"
+                  autoFocus
+                />
+              ) : (
+                <input
+                  type="text"
+                  value={bulkEditModal.value}
+                  onChange={(e) => setBulkEditModal({ ...bulkEditModal, value: e.target.value })}
+                  placeholder={`Enter ${bulkEditModal.field?.toLowerCase()}`}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md focus:ring-2 focus:ring-blue-500"
+                  autoFocus
+                />
+              )}
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={handleApplyBulkEdit}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors font-medium"
+                >
+                  Apply
+                </button>
+                <button
+                  onClick={() => setBulkEditModal({ show: false, field: null, scope: 'all', value: '' })}
+                  className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors font-medium"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Debug Panel */}
       <div className="mt-4 border-t dark:border-gray-700 pt-4">

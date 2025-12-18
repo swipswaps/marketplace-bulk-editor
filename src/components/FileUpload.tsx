@@ -481,35 +481,30 @@ export function FileUpload({ onDataLoaded, onTemplateDetected, currentTemplate, 
       <div className="text-center py-16 bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
         {/* Empty State */}
         <div className="max-w-md mx-auto">
-          <FileSpreadsheet className="mx-auto h-16 w-16 text-gray-400 dark:text-gray-500 mb-6" />
-          <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-3">
-            Get Started with Your Listings
-          </h2>
-          <p className="text-gray-600 dark:text-gray-400 mb-8">
-            Import your Facebook Marketplace listings from an Excel file to edit them in bulk
-          </p>
-
           {/* Primary Upload Area */}
           <div
             {...getRootProps()}
-            className={`border-2 border-dashed rounded-lg p-8 cursor-pointer transition-all ${
+            className={`border-2 border-dashed rounded-lg p-12 cursor-pointer transition-all ${
               isDragActive
                 ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 scale-105'
                 : 'border-gray-300 dark:border-gray-600 hover:border-blue-400 dark:hover:border-blue-500 hover:bg-gray-50 dark:hover:bg-gray-700/50'
             }`}
           >
             <input {...getInputProps()} />
-            <Upload className={`mx-auto h-10 w-10 mb-3 transition-colors ${
+            <Upload className={`mx-auto h-12 w-12 mb-4 transition-colors ${
               isDragActive ? 'text-blue-500' : 'text-gray-400 dark:text-gray-500'
             }`} />
             {isDragActive ? (
               <p className="text-lg font-medium text-blue-600 dark:text-blue-400">Drop your file here</p>
             ) : (
               <>
-                <p className="text-base font-medium text-gray-900 dark:text-white mb-1">
+                <p className="text-lg font-medium text-gray-900 dark:text-white mb-2">
                   Drop your file here or click to browse
                 </p>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
+                  Import Excel files to edit Facebook Marketplace listings in bulk
+                </p>
+                <p className="text-xs text-gray-400 dark:text-gray-500">
                   Supports .xlsx, .xls, and .csv files
                 </p>
               </>
