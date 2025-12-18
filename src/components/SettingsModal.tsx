@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
-import { X, Moon, Sun, Shield, Scale, FileWarning, ExternalLink, AlertTriangle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Moon, Sun, Shield, Scale, FileWarning, ExternalLink, AlertTriangle, Settings, BookOpen, Info, Github, Loader2 } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -8,29 +10,60 @@ interface SettingsModalProps {
   onDarkModeToggle: () => void;
 }
 
+type TabType = 'settings' | 'help' | 'about';
+
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
   onClose,
   darkMode,
   onDarkModeToggle,
 }) => {
+  const [activeTab, setActiveTab] = useState<TabType>('settings');
   const [hasAcceptedTerms, setHasAcceptedTerms] = useState(() => {
     return localStorage.getItem('termsAccepted') === 'true';
   });
+  const [readmeContent, setReadmeContent] = useState<string>('');
+  const [readmeLoading, setReadmeLoading] = useState(false);
+  const [readmeError, setReadmeError] = useState<string | null>(null);
 
   const handleAcceptTerms = (accepted: boolean) => {
     setHasAcceptedTerms(accepted);
     localStorage.setItem('termsAccepted', String(accepted));
   };
 
+  // Fetch README from GitHub when Help tab is opened
+  useEffect(() => {
+    if (activeTab === 'help' && !readmeContent && !readmeLoading) {
+      setReadmeLoading(true);
+      setReadmeError(null);
+
+      fetch('https://raw.githubusercontent.com/swipswaps/marketplace-bulk-editor/main/README.md')
+        .then(response => {
+          if (!response.ok) {
+            throw new Error('Failed to fetch README');
+          }
+          return response.text();
+        })
+        .then(text => {
+          setReadmeContent(text);
+          setReadmeLoading(false);
+        })
+        .catch(error => {
+          console.error('Error fetching README:', error);
+          setReadmeError('Failed to load documentation. Please visit the GitHub repository.');
+          setReadmeLoading(false);
+        });
+    }
+  }, [activeTab, readmeContent, readmeLoading]);
+
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Settings & Legal Notice</h2>
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Settings & Information</h2>
           <button
             onClick={onClose}
             className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
@@ -39,10 +72,50 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </button>
         </div>
 
+        {/* Tabs */}
+        <div className="flex border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
+          <button
+            onClick={() => setActiveTab('settings')}
+            className={`flex items-center gap-2 px-6 py-3 font-medium transition-colors ${
+              activeTab === 'settings'
+                ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400 bg-white dark:bg-gray-800'
+                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+            }`}
+          >
+            <Settings size={18} />
+            Settings & Legal
+          </button>
+          <button
+            onClick={() => setActiveTab('help')}
+            className={`flex items-center gap-2 px-6 py-3 font-medium transition-colors ${
+              activeTab === 'help'
+                ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400 bg-white dark:bg-gray-800'
+                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+            }`}
+          >
+            <BookOpen size={18} />
+            Help & Docs
+          </button>
+          <button
+            onClick={() => setActiveTab('about')}
+            className={`flex items-center gap-2 px-6 py-3 font-medium transition-colors ${
+              activeTab === 'about'
+                ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400 bg-white dark:bg-gray-800'
+                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+            }`}
+          >
+            <Info size={18} />
+            About
+          </button>
+        </div>
+
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          {/* Settings Section */}
-          <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4">
+          {/* Settings Tab */}
+          {activeTab === 'settings' && (
+            <>
+              {/* Settings Section */}
+              <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Preferences</h3>
             
             {/* Dark Mode Toggle */}
@@ -148,21 +221,178 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           </div>
 
-          {/* Terms Acceptance */}
-          <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4">
-            <label className="flex items-start gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={hasAcceptedTerms}
-                onChange={(e) => handleAcceptTerms(e.target.checked)}
-                className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-              />
-              <span className="text-sm text-gray-700 dark:text-gray-300">
-                I understand and accept the terms and conditions. I am solely responsible for ensuring my listings 
-                comply with all applicable laws, intellectual property rights, and Facebook's Commerce Policies.
-              </span>
-            </label>
-          </div>
+              {/* Terms Acceptance */}
+              <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={hasAcceptedTerms}
+                    onChange={(e) => handleAcceptTerms(e.target.checked)}
+                    className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-gray-700 dark:text-gray-300">
+                    I understand and accept the terms and conditions. I am solely responsible for ensuring my listings
+                    comply with all applicable laws, intellectual property rights, and Facebook's Commerce Policies.
+                  </span>
+                </label>
+              </div>
+            </>
+          )}
+
+          {/* Help Tab */}
+          {activeTab === 'help' && (
+            <div className="space-y-4">
+              {readmeLoading && (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="animate-spin text-blue-600 dark:text-blue-400" size={32} />
+                  <span className="ml-3 text-gray-600 dark:text-gray-400">Loading documentation...</span>
+                </div>
+              )}
+
+              {readmeError && (
+                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+                  <p className="text-sm text-red-800 dark:text-red-300 mb-2">{readmeError}</p>
+                  <a
+                    href="https://github.com/swipswaps/marketplace-bulk-editor#readme"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                  >
+                    View on GitHub <ExternalLink size={14} />
+                  </a>
+                </div>
+              )}
+
+              {readmeContent && !readmeLoading && (
+                <div className="prose prose-sm dark:prose-invert max-w-none
+                  prose-headings:text-gray-900 dark:prose-headings:text-white
+                  prose-p:text-gray-700 dark:prose-p:text-gray-300
+                  prose-a:text-blue-600 dark:prose-a:text-blue-400
+                  prose-strong:text-gray-900 dark:prose-strong:text-white
+                  prose-code:text-gray-900 dark:prose-code:text-white
+                  prose-code:bg-gray-100 dark:prose-code:bg-gray-800
+                  prose-pre:bg-gray-100 dark:prose-pre:bg-gray-800
+                  prose-li:text-gray-700 dark:prose-li:text-gray-300
+                  prose-ul:text-gray-700 dark:prose-ul:text-gray-300
+                  prose-ol:text-gray-700 dark:prose-ol:text-gray-300
+                ">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {readmeContent}
+                  </ReactMarkdown>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* About Tab */}
+          {activeTab === 'about' && (
+            <div className="space-y-6">
+              <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6">
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                  Facebook Marketplace Bulk Editor
+                </h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                  A professional-grade web application for editing and combining Facebook Marketplace bulk upload spreadsheets
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <span className="px-3 py-1 bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300 text-xs font-medium rounded-full">
+                    React 19
+                  </span>
+                  <span className="px-3 py-1 bg-purple-100 dark:bg-purple-900/40 text-purple-800 dark:text-purple-300 text-xs font-medium rounded-full">
+                    TypeScript
+                  </span>
+                  <span className="px-3 py-1 bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300 text-xs font-medium rounded-full">
+                    Vite 7
+                  </span>
+                  <span className="px-3 py-1 bg-yellow-100 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-300 text-xs font-medium rounded-full">
+                    Tailwind CSS
+                  </span>
+                </div>
+              </div>
+
+              <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                  <Github size={20} />
+                  Project Links
+                </h3>
+                <div className="space-y-3">
+                  <a
+                    href="https://github.com/swipswaps/marketplace-bulk-editor"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-between p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-blue-500 dark:hover:border-blue-400 transition-colors group"
+                  >
+                    <div>
+                      <p className="font-medium text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400">
+                        GitHub Repository
+                      </p>
+                      <p className="text-xs text-gray-600 dark:text-gray-400">
+                        View source code, report issues, contribute
+                      </p>
+                    </div>
+                    <ExternalLink className="text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400" size={18} />
+                  </a>
+
+                  <a
+                    href="https://swipswaps.github.io/marketplace-bulk-editor/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-between p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-blue-500 dark:hover:border-blue-400 transition-colors group"
+                  >
+                    <div>
+                      <p className="font-medium text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400">
+                        Live Demo
+                      </p>
+                      <p className="text-xs text-gray-600 dark:text-gray-400">
+                        Try the app online
+                      </p>
+                    </div>
+                    <ExternalLink className="text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400" size={18} />
+                  </a>
+
+                  <a
+                    href="https://github.com/swipswaps?tab=repositories"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-between p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-blue-500 dark:hover:border-blue-400 transition-colors group"
+                  >
+                    <div>
+                      <p className="font-medium text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400">
+                        More Projects by swipswaps
+                      </p>
+                      <p className="text-xs text-gray-600 dark:text-gray-400">
+                        Explore other repositories
+                      </p>
+                    </div>
+                    <ExternalLink className="text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400" size={18} />
+                  </a>
+                </div>
+              </div>
+
+              <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">License & Attribution</h3>
+                <div className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
+                  <p>
+                    <strong>License:</strong> MIT License
+                  </p>
+                  <p>
+                    <strong>Author:</strong> swipswaps
+                  </p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-3">
+                    This software is provided "AS IS" without warranty of any kind. See the LICENSE file for complete terms.
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+                <p className="text-xs text-gray-700 dark:text-gray-300">
+                  <strong>Disclaimer:</strong> This software is NOT affiliated with, maintained, authorized, endorsed,
+                  or sponsored by Meta Platforms, Inc. or Facebook, Inc. FACEBOOK® and MARKETPLACE™ are trademarks
+                  of Meta Platforms, Inc.
+                </p>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Footer */}
