@@ -1,12 +1,14 @@
 import { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { Upload, FileSpreadsheet, Table, AlertCircle } from 'lucide-react';
+import { Upload, FileSpreadsheet, Table, AlertCircle, CheckCircle, X, ExternalLink, Download, AlertTriangle } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import type { MarketplaceListing, TemplateMetadata } from '../types';
 
 interface FileUploadProps {
   onDataLoaded: (data: MarketplaceListing[]) => void;
   onTemplateDetected?: (template: TemplateMetadata, sampleData: MarketplaceListing[]) => void;
+  currentTemplate: TemplateMetadata | null;
+  onTemplateLoad: (template: TemplateMetadata, isPreload?: boolean) => void;
 }
 
 interface TemplateDetectionModal {
@@ -16,26 +18,146 @@ interface TemplateDetectionModal {
   sampleData: MarketplaceListing[];
 }
 
-export function FileUpload({ onDataLoaded, onTemplateDetected }: FileUploadProps) {
+export function FileUpload({ onDataLoaded, onTemplateDetected, currentTemplate, onTemplateLoad }: FileUploadProps) {
   const [templateModal, setTemplateModal] = useState<TemplateDetectionModal>({
     show: false,
     fileName: '',
     template: null,
     sampleData: []
   });
+  const [templateError, setTemplateError] = useState<string | null>(null);
+  const [showPreloadWarning, setShowPreloadWarning] = useState(false);
+
+  // Template processing functions
+  const findHeaderRow = (worksheet: XLSX.WorkSheet): number => {
+    const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
+
+    for (let row = range.s.r; row <= Math.min(range.s.r + 10, range.e.r); row++) {
+      const rowData: string[] = [];
+      for (let col = range.s.c; col <= range.e.c; col++) {
+        const cellAddress = XLSX.utils.encode_cell({ r: row, c: col });
+        const cell = worksheet[cellAddress];
+        rowData.push(cell ? String(cell.v) : '');
+      }
+
+      const rowText = rowData.join('|').toUpperCase();
+      if (rowText.includes('TITLE') && rowText.includes('PRICE') && rowText.includes('DESCRIPTION')) {
+        return row;
+      }
+    }
+
+    return 0;
+  };
+
+  const processTemplateFile = useCallback((file: File, isPreload = false) => {
+    setTemplateError(null);
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = e.target?.result;
+        const workbook = XLSX.read(data, { type: 'binary' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+
+        const headerRowIndex = findHeaderRow(worksheet);
+        const headerRows: string[][] = [];
+        const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
+
+        for (let row = range.s.r; row < headerRowIndex; row++) {
+          const rowData: string[] = [];
+          for (let col = range.s.c; col <= range.e.c; col++) {
+            const cellAddress = XLSX.utils.encode_cell({ r: row, c: col });
+            const cell = worksheet[cellAddress];
+            rowData.push(cell ? String(cell.v) : '');
+          }
+          headerRows.push(rowData);
+        }
+
+        const columnHeaders: string[] = [];
+        for (let col = range.s.c; col <= range.e.c; col++) {
+          const cellAddress = XLSX.utils.encode_cell({ r: headerRowIndex, c: col });
+          const cell = worksheet[cellAddress];
+          columnHeaders.push(cell ? String(cell.v) : '');
+        }
+
+        // Extract sample data
+        const sampleData: MarketplaceListing[] = [];
+        const rawData = XLSX.utils.sheet_to_json(worksheet, {
+          range: headerRowIndex,
+          defval: ''
+        }) as Record<string, string | number>[];
+
+        rawData.forEach((row, index) => {
+          sampleData.push({
+            id: `template-${Date.now()}-${index}`,
+            TITLE: String(row.TITLE || ''),
+            PRICE: Number(row.PRICE) || 0,
+            CONDITION: String(row.CONDITION || 'New'),
+            DESCRIPTION: String(row.DESCRIPTION || ''),
+            CATEGORY: String(row.CATEGORY || ''),
+            'OFFER SHIPPING': String(row['OFFER SHIPPING'] || 'No')
+          });
+        });
+
+        const template: TemplateMetadata = {
+          sheetName,
+          headerRowIndex,
+          headerRows,
+          columnHeaders,
+          sampleData: sampleData.length > 0 ? sampleData : undefined
+        };
+
+        onTemplateLoad(template, isPreload);
+      } catch (err) {
+        setTemplateError(`Failed to process template: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      }
+    };
+
+    reader.onerror = () => {
+      setTemplateError('Failed to read file');
+    };
+
+    reader.readAsBinaryString(file);
+  }, [onTemplateLoad]);
+
+  const handlePreloadTemplate = async () => {
+    setShowPreloadWarning(false);
+    setTemplateError(null);
+
+    try {
+      const response = await fetch('/Marketplace_Bulk_Upload_Template.xlsx');
+      if (!response.ok) {
+        throw new Error('Failed to load template');
+      }
+
+      const blob = await response.blob();
+      const file = new File([blob], 'Marketplace_Bulk_Upload_Template.xlsx', {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      });
+
+      processTemplateFile(file, true);
+    } catch (err) {
+      setTemplateError('Failed to load preloaded template. Please upload your own template.');
+    }
+  };
+
+  const handleClearTemplate = () => {
+    onTemplateLoad({ sheetName: '', headerRowIndex: 0, headerRows: [], columnHeaders: [] });
+  };
+
+  const handleLoadTemplateSampleData = () => {
+    if (currentTemplate?.sampleData) {
+      onDataLoaded(currentTemplate.sampleData);
+    }
+  };
 
   const isTemplateFile = (fileName: string, headerRows: string[][], dataRowCount: number): boolean => {
-    // Check if file name suggests it's a template
     const nameIsTemplate = /template/i.test(fileName);
-
-    // Check if there are header rows before the data (like "Facebook Marketplace Bulk Upload Template")
     const hasHeaderRows = headerRows.length > 0 && headerRows.some(row =>
       row.some(cell => /template|facebook|marketplace|bulk.*upload/i.test(cell))
     );
-
-    // Check if there are very few data rows (templates usually have 1-5 sample rows)
     const hasFewRows = dataRowCount > 0 && dataRowCount <= 5;
-
     return nameIsTemplate || (hasHeaderRows && hasFewRows);
   };
 
@@ -211,32 +333,148 @@ export function FileUpload({ onDataLoaded, onTemplateDetected }: FileUploadProps
 
   return (
     <>
-      <div
-        {...getRootProps()}
-        className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
-          isDragActive
-            ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-            : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 hover:border-gray-400 dark:hover:border-gray-500'
-        }`}
-      >
-        <input {...getInputProps()} />
-        <Upload className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-500 mb-4" />
-        {isDragActive ? (
-          <p className="text-lg text-blue-600 dark:text-blue-400">Drop the files here...</p>
-        ) : (
-          <div>
-            <p className="text-lg text-gray-700 dark:text-gray-300 mb-2">
-              Drag & drop Excel files here, or click to select
-            </p>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              Supports .xlsx, .xls, and .csv files
-            </p>
-            <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
-              💡 Upload data files or Facebook templates
-            </p>
+      {/* Combined Upload Area */}
+      <div className="space-y-4">
+        {/* Template Status Section */}
+        {currentTemplate && currentTemplate.columnHeaders.length > 0 && (
+          <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-3 flex-1">
+                <CheckCircle className="text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" size={20} />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-green-900 dark:text-green-100">
+                    Template Loaded
+                  </p>
+                  <div className="mt-2 text-xs text-green-700 dark:text-green-300 space-y-1">
+                    <p>Sheet: <span className="font-mono">{currentTemplate.sheetName}</span></p>
+                    <p>Header rows: {currentTemplate.headerRows.length}</p>
+                    <p>Columns: {currentTemplate.columnHeaders.filter(h => h).join(', ')}</p>
+                    {currentTemplate.sampleData && currentTemplate.sampleData.length > 0 && (
+                      <p>Sample data: {currentTemplate.sampleData.length} listing(s)</p>
+                    )}
+                  </div>
+
+                  {/* Load Sample Data Button */}
+                  {currentTemplate.sampleData && currentTemplate.sampleData.length > 0 && (
+                    <button
+                      onClick={handleLoadTemplateSampleData}
+                      className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/40 border border-blue-300 dark:border-blue-700 rounded-md hover:bg-blue-200 dark:hover:bg-blue-900/60 transition-colors"
+                    >
+                      <Table size={14} />
+                      Load {currentTemplate.sampleData.length} Sample Listing{currentTemplate.sampleData.length !== 1 ? 's' : ''} into Editor
+                    </button>
+                  )}
+                </div>
+              </div>
+              <button
+                onClick={handleClearTemplate}
+                className="flex items-center gap-1 px-2 py-1 text-xs text-green-700 dark:text-green-300 hover:bg-green-100 dark:hover:bg-green-900/40 rounded transition-colors"
+              >
+                <X size={14} />
+                Clear
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Main Upload Area */}
+        <div
+          {...getRootProps()}
+          className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
+            isDragActive
+              ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+              : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 hover:border-gray-400 dark:hover:border-gray-500'
+          }`}
+        >
+          <input {...getInputProps()} />
+          <Upload className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-500 mb-4" />
+          {isDragActive ? (
+            <p className="text-lg text-blue-600 dark:text-blue-400">Drop the files here...</p>
+          ) : (
+            <div>
+              <p className="text-lg text-gray-700 dark:text-gray-300 mb-2">
+                Drag & drop Excel files here, or click to select
+              </p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Supports .xlsx, .xls, and .csv files • Upload data files or Facebook templates
+              </p>
+
+              {/* Template Upload Options */}
+              {!currentTemplate || currentTemplate.columnHeaders.length === 0 ? (
+                <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">
+                    📋 Need a Facebook Marketplace template?
+                  </p>
+                  <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+                    <a
+                      href="https://www.facebook.com/business/help/125074381480892"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="inline-flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                    >
+                      <ExternalLink size={12} />
+                      Get official template from Facebook
+                    </a>
+                    <span className="text-xs text-gray-400">or</span>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowPreloadWarning(true);
+                      }}
+                      className="inline-flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:underline"
+                    >
+                      <Download size={12} />
+                      Use bundled template (may be outdated)
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          )}
+        </div>
+
+        {/* Template Error */}
+        {templateError && (
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
+            <p className="text-sm text-red-800 dark:text-red-200">{templateError}</p>
           </div>
         )}
       </div>
+
+      {/* Preload Warning Modal */}
+      {showPreloadWarning && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
+            <div className="flex items-start gap-3 mb-4">
+              <AlertTriangle className="text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" size={24} />
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                  Use Bundled Template?
+                </h3>
+                <p className="text-sm text-gray-700 dark:text-gray-300 mb-3">
+                  The bundled template may be outdated. For best results, download the latest template from Facebook.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowPreloadWarning(false)}
+                className="flex-1 px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handlePreloadTemplate}
+                className="flex-1 px-4 py-2 text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+              >
+                Use Bundled Template
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Template Detection Modal */}
       {templateModal.show && (

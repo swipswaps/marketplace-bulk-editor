@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { FileUpload } from './components/FileUpload';
 import { DataTable } from './components/DataTable';
 import { ExportButton } from './components/ExportButton';
-import { TemplateUpload } from './components/TemplateUpload';
 import { SettingsModal } from './components/SettingsModal';
 import { Settings } from 'lucide-react';
 import type { MarketplaceListing, TemplateMetadata } from './types';
@@ -221,16 +220,13 @@ function App() {
       {/* Main Content */}
       <main className="flex-1 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Template Upload Section */}
-          <div className="mb-6">
-            <TemplateUpload onTemplateLoad={handleTemplateLoad} currentTemplate={template} />
-          </div>
-
-          {/* File Upload Section */}
+          {/* Combined Upload Section */}
           <div className="mb-8">
             <FileUpload
               onDataLoaded={handleDataLoaded}
               onTemplateDetected={handleTemplateDetected}
+              currentTemplate={template}
+              onTemplateLoad={handleTemplateLoad}
             />
           </div>
 

@@ -29,4 +29,5 @@ export interface TemplateMetadata {
   headerRowIndex: number; // 0-based index of the row containing column headers
   headerRows: string[][]; // All rows before the column header row (e.g., title, instructions)
   columnHeaders: string[]; // The actual column headers (TITLE, PRICE, etc.)
+  sampleData?: MarketplaceListing[]; // Optional sample data from the template
 }
