@@ -23,3 +23,10 @@ export const CONDITIONS = [
   'Used - Good',
   'Used - Fair'
 ] as const;
+
+export interface TemplateMetadata {
+  sheetName: string;
+  headerRowIndex: number; // 0-based index of the row containing column headers
+  headerRows: string[][]; // All rows before the column header row (e.g., title, instructions)
+  columnHeaders: string[]; // The actual column headers (TITLE, PRICE, etc.)
+}

@@ -2,8 +2,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { FileUpload } from './components/FileUpload';
 import { DataTable } from './components/DataTable';
 import { ExportButton } from './components/ExportButton';
+import { TemplateUpload } from './components/TemplateUpload';
 import { Moon, Sun } from 'lucide-react';
-import type { MarketplaceListing } from './types';
+import type { MarketplaceListing, TemplateMetadata } from './types';
 import { FileSpreadsheet, Trash2 } from 'lucide-react';
 
 type SortField = keyof MarketplaceListing | null;
@@ -16,6 +17,10 @@ function App() {
   const [darkMode, setDarkMode] = useState<boolean>(() => {
     const saved = localStorage.getItem('darkMode');
     return saved ? JSON.parse(saved) : false;
+  });
+  const [template, setTemplate] = useState<TemplateMetadata | null>(() => {
+    const saved = localStorage.getItem('fbTemplate');
+    return saved ? JSON.parse(saved) : null;
   });
 
   // Undo/Redo state
@@ -31,6 +36,19 @@ function App() {
     }
     localStorage.setItem('darkMode', JSON.stringify(darkMode));
   }, [darkMode]);
+
+  // Save template to localStorage
+  useEffect(() => {
+    if (template) {
+      localStorage.setItem('fbTemplate', JSON.stringify(template));
+    } else {
+      localStorage.removeItem('fbTemplate');
+    }
+  }, [template]);
+
+  const handleTemplateLoad = (newTemplate: TemplateMetadata) => {
+    setTemplate(newTemplate);
+  };
 
   const handleDataLoaded = (newData: MarketplaceListing[]) => {
     // Merge with existing data
@@ -153,7 +171,7 @@ function App() {
                   <Trash2 size={16} />
                   Clear All
                 </button>
-                <ExportButton data={listings} sortField={sortField} sortDirection={sortDirection} />
+                <ExportButton data={listings} sortField={sortField} sortDirection={sortDirection} template={template} />
               </>
             )}
           </div>
@@ -163,6 +181,11 @@ function App() {
       {/* Main Content */}
       <main className="flex-1 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Template Upload Section */}
+          <div className="mb-6">
+            <TemplateUpload onTemplateLoad={handleTemplateLoad} currentTemplate={template} />
+          </div>
+
           {/* File Upload Section */}
           <div className="mb-8">
             <FileUpload onDataLoaded={handleDataLoaded} />
