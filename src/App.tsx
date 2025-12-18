@@ -3,8 +3,8 @@ import { FileUpload } from './components/FileUpload';
 import { DataTable } from './components/DataTable';
 import { ExportButton } from './components/ExportButton';
 import { TemplateUpload } from './components/TemplateUpload';
-import { LegalNotice } from './components/LegalNotice';
-import { Moon, Sun } from 'lucide-react';
+import { SettingsModal } from './components/SettingsModal';
+import { Settings } from 'lucide-react';
 import type { MarketplaceListing, TemplateMetadata } from './types';
 import { FileSpreadsheet, Trash2 } from 'lucide-react';
 
@@ -22,6 +22,10 @@ function App() {
   const [template, setTemplate] = useState<TemplateMetadata | null>(() => {
     const saved = localStorage.getItem('fbTemplate');
     return saved ? JSON.parse(saved) : null;
+  });
+  const [showSettings, setShowSettings] = useState(false);
+  const [hasUploadedFile, setHasUploadedFile] = useState(() => {
+    return localStorage.getItem('hasUploadedFile') === 'true';
   });
 
   // Undo/Redo state
@@ -56,6 +60,13 @@ function App() {
     const updatedListings = [...listings, ...newData];
     console.log(`📊 Data loaded: ${newData.length} new listings + ${listings.length} existing = ${updatedListings.length} total`);
     updateListingsWithHistory(updatedListings);
+
+    // Show settings modal on first file upload
+    if (!hasUploadedFile) {
+      setHasUploadedFile(true);
+      localStorage.setItem('hasUploadedFile', 'true');
+      setShowSettings(true);
+    }
   };
 
   const handleClearAll = () => {
@@ -155,13 +166,13 @@ function App() {
               </button>
             </div>
 
-            {/* Dark Mode Toggle */}
+            {/* Settings Button */}
             <button
-              onClick={() => setDarkMode(!darkMode)}
+              onClick={() => setShowSettings(true)}
               className="p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-              title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+              title="Settings & Legal Notice"
             >
-              {darkMode ? <Sun size={20} /> : <Moon size={20} />}
+              <Settings size={20} />
             </button>
 
             {listings.length > 0 && (
@@ -180,12 +191,17 @@ function App() {
         </div>
       </header>
 
+      {/* Settings Modal */}
+      <SettingsModal
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
+        darkMode={darkMode}
+        onDarkModeToggle={() => setDarkMode(!darkMode)}
+      />
+
       {/* Main Content */}
       <main className="flex-1 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Legal Notice */}
-          <LegalNotice compact={listings.length > 0} />
-
           {/* Template Upload Section */}
           <div className="mb-6">
             <TemplateUpload onTemplateLoad={handleTemplateLoad} currentTemplate={template} />
