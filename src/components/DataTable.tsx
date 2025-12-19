@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Trash2, Plus, ArrowUpDown, ArrowUp, ArrowDown, Copy, Eye, MoreVertical } from 'lucide-react';
+import { Trash2, Plus, ArrowUpDown, ArrowUp, ArrowDown, Copy, Eye, MoreVertical, X } from 'lucide-react';
 import type { MarketplaceListing } from '../types';
 import { CONDITIONS } from '../types';
 
@@ -291,19 +291,25 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
   };
 
   // Sort data
-  // Filter data based on search query
+  // Filter data based on search query with fuzzy matching
   const filteredData = data.filter((listing) => {
     if (!searchQuery.trim()) return true;
 
-    const query = searchQuery.toLowerCase();
-    return (
-      listing.TITLE.toLowerCase().includes(query) ||
-      listing.DESCRIPTION.toLowerCase().includes(query) ||
-      listing.CATEGORY.toLowerCase().includes(query) ||
-      listing.CONDITION.toLowerCase().includes(query) ||
-      String(listing.PRICE).includes(query) ||
-      listing['OFFER SHIPPING'].toLowerCase().includes(query)
-    );
+    // Split search query into individual words
+    const searchTerms = searchQuery.toLowerCase().trim().split(/\s+/);
+
+    // Combine all searchable fields into one string
+    const searchableText = [
+      listing.TITLE || '',
+      listing.DESCRIPTION || '',
+      listing.CATEGORY || '',
+      listing.CONDITION || '',
+      String(listing.PRICE || ''),
+      listing['OFFER SHIPPING'] || ''
+    ].join(' ').toLowerCase();
+
+    // Check if ALL search terms are found (word portions match)
+    return searchTerms.every(term => searchableText.includes(term));
   });
 
   // Sort filtered data
@@ -441,14 +447,24 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
           )}
 
           {/* Search box */}
-          <div className="flex-1 max-w-md">
+          <div className="flex-1 max-w-md relative">
             <input
               type="text"
-              placeholder="Search listings..."
+              placeholder="Search listings... (supports multiple words)"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+              className="w-full px-4 py-2 pr-10 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+              title="Search by title, description, category, condition, price, or shipping. Use multiple words to narrow results."
             />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+                title="Clear search"
+              >
+                <X size={16} />
+              </button>
+            )}
           </div>
 
           {/* Column visibility toggle */}
@@ -490,8 +506,15 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
 
           {/* Results count */}
           {searchQuery && (
-            <div className="text-sm text-gray-600 dark:text-gray-400">
-              {filteredData.length} of {data.length} listings
+            <div className={`text-sm font-medium ${
+              filteredData.length === 0
+                ? 'text-red-600 dark:text-red-400'
+                : 'text-blue-600 dark:text-blue-400'
+            }`}>
+              {filteredData.length === 0
+                ? 'No results found'
+                : `${filteredData.length} of ${data.length} listings`
+              }
             </div>
           )}
         </div>
@@ -664,8 +687,26 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
             </tr>
           </thead>
           <tbody>
-            {sortedData.map((listing) => (
-              <tr key={listing.id} className="hover:bg-blue-50 dark:hover:bg-gray-700 hover:shadow-sm transition-colors">
+            {sortedData.length === 0 ? (
+              <tr>
+                <td colSpan={Object.values(visibleColumns).filter(Boolean).length + 2} className="px-4 py-12 text-center">
+                  <div className="text-gray-500 dark:text-gray-400">
+                    {searchQuery ? (
+                      <div>
+                        <p className="text-lg font-medium mb-2">No results found</p>
+                        <p className="text-sm">Try adjusting your search terms</p>
+                      </div>
+                    ) : (
+                      <div>
+                        <p className="text-lg font-medium mb-2">No listings yet</p>
+                        <p className="text-sm">Click "Add Row" to create your first listing</p>
+                      </div>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            ) : sortedData.map((listing) => (
+              <tr key={listing.id} className="hover:bg-blue-50 dark:hover:bg-gray-700 hover:shadow-md transition-all duration-150">
                 {/* Checkbox */}
                 <td className="px-4 py-2 border-b dark:border-gray-700">
                   <input
@@ -714,12 +755,18 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
                         autoComplete="off"
                         autoFocus
                       />
-                      <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      <div className={`text-xs mt-1 ${
+                        listing.TITLE.length > 140
+                          ? 'text-red-600 dark:text-red-400 font-medium'
+                          : listing.TITLE.length > 120
+                          ? 'text-yellow-600 dark:text-yellow-400'
+                          : 'text-gray-500 dark:text-gray-400'
+                      }`}>
                         {listing.TITLE.length}/150 characters
                       </div>
                     </div>
                   ) : (
-                    <div className="truncate" title={listing.TITLE}>{listing.TITLE || <span className="text-gray-400 dark:text-gray-500">Click to edit</span>}</div>
+                    <div className="line-clamp-2" title={listing.TITLE}>{listing.TITLE || <span className="text-gray-400 dark:text-gray-500">Click to edit</span>}</div>
                   )}
                 </td>}
 
@@ -789,7 +836,7 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
                       )}
                     </div>
                   ) : (
-                    <div>{listing.PRICE}</div>
+                    <div className="font-medium">${Number(listing.PRICE).toFixed(2)}</div>
                   )}
                 </td>}
 
@@ -819,7 +866,17 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
                       ))}
                     </select>
                   ) : (
-                    <div>{listing.CONDITION}</div>
+                    <div className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                      listing.CONDITION === 'New'
+                        ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                        : listing.CONDITION === 'Used - Like New'
+                        ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                        : listing.CONDITION === 'Used - Good'
+                        ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                        : 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200'
+                    }`}>
+                      {listing.CONDITION}
+                    </div>
                   )}
                 </td>}
 
@@ -870,7 +927,7 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
                       </datalist>
                     </>
                   ) : (
-                    <div className="whitespace-pre-wrap" title={listing.DESCRIPTION}>{listing.DESCRIPTION || <span className="text-gray-400 dark:text-gray-500">Click to edit</span>}</div>
+                    <div className="line-clamp-3 whitespace-pre-wrap" title={listing.DESCRIPTION}>{listing.DESCRIPTION || <span className="text-gray-400 dark:text-gray-500">Click to edit</span>}</div>
                   )}
                 </td>}
 
@@ -933,7 +990,13 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
                       <option value="No">No</option>
                     </select>
                   ) : (
-                    <div>{listing['OFFER SHIPPING']}</div>
+                    <div className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                      listing['OFFER SHIPPING'] === 'Yes'
+                        ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                        : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
+                    }`}>
+                      {listing['OFFER SHIPPING']}
+                    </div>
                   )}
                 </td>}
 
