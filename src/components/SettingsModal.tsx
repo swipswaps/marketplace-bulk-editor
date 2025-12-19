@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Moon, Sun, Shield, Scale, FileWarning, ExternalLink, AlertTriangle, Settings, BookOpen, Info, Github, Loader2 } from 'lucide-react';
+import { X, Moon, Sun, Shield, Scale, FileWarning, ExternalLink, AlertTriangle, Settings, BookOpen, Info, Github, Loader2, Database } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -10,7 +10,7 @@ interface SettingsModalProps {
   onDarkModeToggle: () => void;
 }
 
-type TabType = 'settings' | 'help' | 'about';
+type TabType = 'settings' | 'help' | 'backend' | 'about';
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
@@ -25,6 +25,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [readmeContent, setReadmeContent] = useState<string>('');
   const [readmeLoading, setReadmeLoading] = useState(false);
   const [readmeError, setReadmeError] = useState<string | null>(null);
+  const [backendDocsContent, setBackendDocsContent] = useState<string>('');
+  const [backendDocsLoading, setBackendDocsLoading] = useState(false);
+  const [backendDocsError, setBackendDocsError] = useState<string | null>(null);
 
   const handleAcceptTerms = (accepted: boolean) => {
     setHasAcceptedTerms(accepted);
@@ -55,6 +58,31 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         });
     }
   }, [activeTab, readmeContent, readmeLoading]);
+
+  // Fetch Backend Documentation when Backend tab is opened
+  useEffect(() => {
+    if (activeTab === 'backend' && !backendDocsContent && !backendDocsLoading) {
+      setBackendDocsLoading(true);
+      setBackendDocsError(null);
+
+      fetch('https://raw.githubusercontent.com/swipswaps/marketplace-bulk-editor/main/HOW_TO_USE_DOCKER_BACKEND.md')
+        .then(response => {
+          if (!response.ok) {
+            throw new Error('Failed to fetch backend documentation');
+          }
+          return response.text();
+        })
+        .then(text => {
+          setBackendDocsContent(text);
+          setBackendDocsLoading(false);
+        })
+        .catch(error => {
+          console.error('Error fetching backend docs:', error);
+          setBackendDocsError('Failed to load backend documentation. Please visit the GitHub repository.');
+          setBackendDocsLoading(false);
+        });
+    }
+  }, [activeTab, backendDocsContent, backendDocsLoading]);
 
   if (!isOpen) return null;
 
@@ -95,6 +123,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           >
             <BookOpen size={18} />
             Help & Docs
+          </button>
+          <button
+            onClick={() => setActiveTab('backend')}
+            className={`flex items-center gap-2 px-6 py-3 font-medium transition-colors ${
+              activeTab === 'backend'
+                ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400 bg-white dark:bg-gray-800'
+                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+            }`}
+          >
+            <Database size={18} />
+            Backend Guide
           </button>
           <button
             onClick={() => setActiveTab('about')}
@@ -294,6 +333,72 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     }}
                   >
                     {readmeContent}
+                  </ReactMarkdown>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Backend Guide Tab */}
+          {activeTab === 'backend' && (
+            <div className="space-y-4">
+              {backendDocsLoading && (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="animate-spin text-blue-600 dark:text-blue-400" size={32} />
+                  <span className="ml-3 text-gray-600 dark:text-gray-400">Loading backend documentation...</span>
+                </div>
+              )}
+
+              {backendDocsError && (
+                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" size={20} />
+                    <div className="flex-1">
+                      <p className="text-sm text-red-800 dark:text-red-200 mb-2">{backendDocsError}</p>
+                      <a
+                        href="https://github.com/swipswaps/marketplace-bulk-editor/blob/main/HOW_TO_USE_DOCKER_BACKEND.md"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-sm text-red-700 dark:text-red-300 hover:underline"
+                      >
+                        View on GitHub <ExternalLink size={14} />
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {backendDocsContent && !backendDocsLoading && (
+                <div className="prose prose-sm dark:prose-invert max-w-none
+                  prose-headings:font-bold
+                  prose-h1:text-3xl prose-h1:mb-4 prose-h1:mt-6
+                  prose-h2:text-2xl prose-h2:mb-3 prose-h2:mt-5 prose-h2:border-b prose-h2:border-gray-200 dark:prose-h2:border-gray-700 prose-h2:pb-2
+                  prose-h3:text-xl prose-h3:mb-2 prose-h3:mt-4
+                  prose-h4:text-lg prose-h4:mb-2 prose-h4:mt-3
+                  prose-p:leading-relaxed prose-p:mb-4
+                  prose-a:text-blue-600 dark:prose-a:text-blue-400 prose-a:no-underline hover:prose-a:underline
+                  prose-strong:font-semibold
+                  prose-code:text-sm prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:bg-gray-100 dark:prose-code:bg-gray-800 prose-code:text-pink-600 dark:prose-code:text-pink-400 prose-code:before:content-none prose-code:after:content-none
+                  prose-pre:bg-gray-100 dark:prose-pre:bg-gray-800 prose-pre:border prose-pre:border-gray-200 dark:prose-pre:border-gray-700 prose-pre:rounded-lg prose-pre:p-4
+                  prose-ul:my-4 prose-ul:list-disc prose-ul:pl-6
+                  prose-ol:my-4 prose-ol:list-decimal prose-ol:pl-6
+                  prose-li:my-1
+                  prose-blockquote:border-l-4 prose-blockquote:border-gray-300 dark:prose-blockquote:border-gray-600 prose-blockquote:pl-4 prose-blockquote:italic
+                  prose-hr:border-gray-200 dark:prose-hr:border-gray-700 prose-hr:my-8
+                  prose-table:border-collapse prose-table:w-full
+                  prose-th:border prose-th:border-gray-300 dark:prose-th:border-gray-600 prose-th:bg-gray-100 dark:prose-th:bg-gray-800 prose-th:px-4 prose-th:py-2 prose-th:text-left
+                  prose-td:border prose-td:border-gray-300 dark:prose-td:border-gray-600 prose-td:px-4 prose-td:py-2
+                  prose-img:rounded-lg prose-img:shadow-md
+                ">
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    components={{
+                      a: ({ node, ...props }) => (
+                        <a {...props} target="_blank" rel="noopener noreferrer" />
+                      ),
+                    }}
+                  >
+                    {backendDocsContent}
                   </ReactMarkdown>
                 </div>
               )}

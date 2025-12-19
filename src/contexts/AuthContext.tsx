@@ -22,7 +22,7 @@ interface AuthContextType {
   isLoading: boolean;
   error: string | null;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string) => Promise<void>;
+  register: (email: string, password: string, firstName: string, lastName: string) => Promise<void>;
   logout: () => void;
   clearError: () => void;
 }
@@ -76,7 +76,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const register = async (email: string, password: string) => {
+  const register = async (email: string, password: string, firstName: string, lastName: string) => {
     setIsLoading(true);
     setError(null);
 
@@ -85,7 +85,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user: User;
         access_token: string;
         refresh_token: string;
-      }>('/api/auth/register', { email, password });
+      }>('/api/auth/register', {
+        email,
+        password,
+        first_name: firstName,
+        last_name: lastName
+      });
 
       apiClient.setTokens(response.access_token, response.refresh_token);
       setUser(response.user);
