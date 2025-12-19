@@ -1,6 +1,6 @@
 ---
 type: "always_apply"
-description: "Mandatory rules for all AI assistant interactions - workspace verification, evidence requirements, testing protocols, Docker deployment, ORM safety, feature preservation, complete workflow testing"
+description: "Mandatory rules for all AI assistant interactions - workspace verification, evidence requirements, Selenium testing (VISIBLE mode, OCR verification, screenshots in README), complete workflow testing, Docker deployment, ORM safety, feature preservation"
 ---
 
 1. Workspace Authority (HARD STOP)
@@ -121,7 +121,7 @@ Provide evidence per feature
 
 No silent removals. No assumptions.
 
-9. End-to-End Workflow Proof (CRITICAL)
+9. End-to-End Workflow Proof & Selenium Testing (CRITICAL)
 
 Loading a page ≠ proof.
 
@@ -137,15 +137,9 @@ Integration points
 
 Failure paths (where applicable)
 
-Selenium tests must show:
+### Selenium Testing Requirements (MANDATORY)
 
-All steps
-
-Console output
-
-Screenshots per major step
-
-**CRITICAL: Selenium tests MUST run in visible mode (NOT headless) unless explicitly specified otherwise by the user.**
+**CRITICAL: Selenium tests MUST run in VISIBLE mode (NOT headless) unless explicitly specified otherwise by the user.**
 
 Forbidden:
 - `options.add_argument('--headless')`
@@ -157,6 +151,137 @@ Allowed only if user explicitly requests:
 - "use headless browser"
 
 Rationale: Visible mode allows user to see what's happening, verify behavior visually, and debug issues. Headless mode hides problems and prevents user observation.
+
+### Screenshot Requirements (MANDATORY)
+
+**All screenshots MUST:**
+1. **Be taken at EACH major step** of the workflow (not just initial page load)
+2. **Be saved with descriptive filenames** (e.g., `screenshot_01_frontend_loaded.png`, `screenshot_02_backend_status.png`)
+3. **Be verified with OCR** (Tesseract or similar) to confirm text is visible
+4. **Be embedded in documentation** (README.md, evidence documents) with:
+   - Image markdown: `![Description](./screenshot_name.png)`
+   - Caption describing what the screenshot shows
+   - OCR verification note if applicable
+5. **Show actual UI state** (not blank pages, loading screens, or error states unless testing errors)
+6. **Include console logs** captured via Chrome DevTools Protocol
+7. **Be taken in VISIBLE mode** (user can see browser window during test)
+
+### Complete Workflow Testing (Rule 22)
+
+**The assistant MUST test the COMPLETE workflow, not just initial page load.**
+
+**For backend/database features, minimum steps:**
+1. Setup: `./docker-start.sh` + container status
+2. User registration: API call + JWT tokens
+3. Login: API call + response
+4. Create listing: API call + database verification
+5. Templates: Creation + usage
+6. OCR: File upload + processing + results
+7. Export: Export + file content verification
+8. Rate limiting: 429 error after exceeding limits
+9. Database: `psql` queries proving persistence
+10. Redis: `redis-cli` commands proving caching
+11. Cleanup: `./docker-stop.sh` + data preservation
+
+**For UI features, minimum steps:**
+1. Initial load
+2. Backend status (collapsed + expanded)
+3. File upload area
+4. Data table with data
+5. Cell editing (before/after)
+6. Export preview modal
+7. Dark mode toggle
+8. Search/filter
+9. Bulk actions
+10. Undo/redo
+
+**Minimum screenshots required:**
+- Backend/database features: 13+ screenshots
+- UI features: 10+ screenshots
+
+### Console Log Capture (MANDATORY)
+
+**All Selenium tests MUST capture console logs:**
+
+```python
+from selenium.webdriver.chrome.options import Options
+
+options = Options()
+options.set_capability('goog:loggingPrefs', {'browser': 'ALL'})
+# DO NOT add --headless unless user explicitly requests it
+
+driver = webdriver.Chrome(options=options)
+driver.get("http://localhost:5173")
+
+# Capture console logs
+for entry in driver.get_log('browser'):
+    print(f"[{entry['level']}] {entry['message']}")
+```
+
+**Report:**
+- Total console entries
+- Number of errors (should be 0 for successful tests)
+- Number of warnings
+- Sample of info/debug messages
+
+### OCR Verification (MANDATORY)
+
+**All screenshots MUST be verified with OCR:**
+
+```python
+import pytesseract
+from PIL import Image
+
+img = Image.open('screenshot_01_frontend_loaded.png')
+text = pytesseract.image_to_string(img)
+
+# Verify expected text appears
+assert "Docker Backend Connected" in text
+assert "Marketplace Bulk Editor" in text
+```
+
+**Report:**
+- Screenshot filename
+- File size
+- OCR extracted text (key phrases)
+- Verification status (✅ or ❌)
+
+### Documentation Requirements (MANDATORY)
+
+**After Selenium testing, the assistant MUST:**
+
+1. **Embed screenshots in README.md** with:
+   - Section titled "📸 Screenshots (Selenium Testing - VISIBLE Mode)"
+   - Each screenshot with descriptive caption
+   - OCR verification note
+   - Console logs status (0 errors)
+   - Test date
+
+2. **Create evidence document** (e.g., COMPLETE_WORKFLOW_EVIDENCE.md) with:
+   - Executive summary of all tested features
+   - Step-by-step workflow with terminal output
+   - API request/response examples
+   - Database query results
+   - Screenshot references with OCR results
+   - Compliance checklist
+
+3. **Update backend/README.md** (if applicable) with:
+   - Complete API workflow examples
+   - Database verification examples
+   - Redis verification examples
+   - Rate limiting demonstration
+
+### Failure to Comply
+
+**If the assistant:**
+- Uses headless mode without explicit user request
+- Takes only 1-2 screenshots instead of complete workflow
+- Does not verify screenshots with OCR
+- Does not embed screenshots in README.md
+- Does not capture console logs
+- Does not test complete workflow
+
+**Then the user MUST stop the assistant and request compliance with Rule 9.**
 
 10. User Constraints Override Everything
 
