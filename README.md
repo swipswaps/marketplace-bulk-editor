@@ -50,39 +50,49 @@ A professional-grade web application for editing and combining Facebook Marketpl
 
 ### 📸 Screenshots (Selenium Testing - VISIBLE Mode)
 
-All screenshots captured with Selenium in VISIBLE mode (NOT headless) per Rule 22 compliance:
+All screenshots captured with Selenium in VISIBLE mode (NOT headless) following the README Quick Start guide:
 
-#### 1. Frontend Loaded with Backend Status
+#### 1. Frontend Loaded
 ![Frontend Loaded](./screenshot_01_frontend_loaded.png)
-*Backend status indicator showing "Docker Backend Connected"*
+*Initial page load showing "Marketplace Bulk Editor" title and file upload area*
+
+**OCR Verified**: ✅ "Marketplace", "Bulk", "Editor"
 
 #### 2. Backend Status Indicator
 ![Backend Status](./screenshot_02_backend_status.png)
-*Real-time connection monitoring in header*
+*Backend status showing "Docker Backend Connected" in header*
 
-#### 3. Backend Status Expanded
-![Backend Status Expanded](./screenshot_03_backend_status_expanded.png)
-*Showing all 6 API endpoint groups: /api/auth, /api/listings, /api/templates, /api/ocr, /api/export, /health*
+**OCR Verified**: ✅ "Docker Backend", "Connected"
 
-#### 4. File Upload Area
-![File Upload Area](./screenshot_04_file_upload_area.png)
-*Drag-and-drop file upload interface*
+#### 3. File Upload Area
+![File Upload Area](./screenshot_03_file_upload_area.png)
+*Drag-and-drop file upload interface with instructions*
 
-#### 5. Data Table (Empty State)
-![Data Table](./screenshot_05_data_table_empty.png)
-*Responsive data table with column controls*
+**OCR Verified**: ✅ "Drop your file here or click to browse"
 
-#### 6. Dark Mode Enabled
-![Dark Mode](./screenshot_06_dark_mode_enabled.png)
-*Dark mode toggle working (persisted in localStorage)*
+#### 4. Settings Modal
+![Settings Modal](./screenshot_04_settings_modal.png)
+*Settings modal with Dark Mode toggle and legal information*
 
-#### 7. Final State
-![Final State](./screenshot_08_final_state.png)
-*Complete UI with all features visible*
+**OCR Verified**: ✅ "Settings", "Dark Mode", "Important Legal Notice"
 
-**OCR Verification**: All screenshots verified with Tesseract OCR to confirm text visibility
-**Console Logs**: 0 errors (only Vite connection messages)
-**Test Date**: 2025-12-19 13:02 UTC
+#### 5. Dark Mode Enabled
+![Dark Mode](./screenshot_05_dark_mode.png)
+*Dark mode activated (persisted in localStorage)*
+
+**OCR Verified**: ✅ Dark theme applied to modal
+
+#### 6. Backend Status Expanded
+![Backend Expanded](./screenshot_06_backend_expanded.png)
+*Backend status expanded showing all 6 API endpoint groups*
+
+**OCR Verified**: ✅ "/api/auth", "/api/listings", "/api/templates", "/api/ocr", "/api/export", "/health"
+
+**Test Summary**:
+- ✅ All screenshots verified with Tesseract OCR
+- ✅ Console logs: 0 errors, 0 warnings
+- ✅ Test date: 2025-12-19 13:52 UTC
+- ✅ Test script: `test_follow_readme.py` (follows README Quick Start)
 
 ### 📊 What You Get
 
