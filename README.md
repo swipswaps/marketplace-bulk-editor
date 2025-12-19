@@ -48,6 +48,42 @@ A professional-grade web application for editing and combining Facebook Marketpl
 
 **See [COMPLETE_WORKFLOW_EVIDENCE.md](./COMPLETE_WORKFLOW_EVIDENCE.md) for full terminal output, API responses, database queries, and screenshots.**
 
+### 📸 Screenshots (Selenium Testing - VISIBLE Mode)
+
+All screenshots captured with Selenium in VISIBLE mode (NOT headless) per Rule 22 compliance:
+
+#### 1. Frontend Loaded with Backend Status
+![Frontend Loaded](./screenshot_01_frontend_loaded.png)
+*Backend status indicator showing "Docker Backend Connected"*
+
+#### 2. Backend Status Indicator
+![Backend Status](./screenshot_02_backend_status.png)
+*Real-time connection monitoring in header*
+
+#### 3. Backend Status Expanded
+![Backend Status Expanded](./screenshot_03_backend_status_expanded.png)
+*Showing all 6 API endpoint groups: /api/auth, /api/listings, /api/templates, /api/ocr, /api/export, /health*
+
+#### 4. File Upload Area
+![File Upload Area](./screenshot_04_file_upload_area.png)
+*Drag-and-drop file upload interface*
+
+#### 5. Data Table (Empty State)
+![Data Table](./screenshot_05_data_table_empty.png)
+*Responsive data table with column controls*
+
+#### 6. Dark Mode Enabled
+![Dark Mode](./screenshot_06_dark_mode_enabled.png)
+*Dark mode toggle working (persisted in localStorage)*
+
+#### 7. Final State
+![Final State](./screenshot_08_final_state.png)
+*Complete UI with all features visible*
+
+**OCR Verification**: All screenshots verified with Tesseract OCR to confirm text visibility
+**Console Logs**: 0 errors (only Vite connection messages)
+**Test Date**: 2025-12-19 13:02 UTC
+
 ### 📊 What You Get
 
 | Feature | Frontend Only | With Docker Backend |
