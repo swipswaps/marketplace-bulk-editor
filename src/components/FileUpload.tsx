@@ -164,6 +164,11 @@ export function FileUpload({ onDataLoaded, onTemplateDetected, currentTemplate, 
   };
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
+    // Accumulate all listings from all files before calling onDataLoaded
+    const allListings: MarketplaceListing[] = [];
+    let filesProcessed = 0;
+    const totalFiles = acceptedFiles.length;
+
     acceptedFiles.forEach((file) => {
       const reader = new FileReader();
 
@@ -274,7 +279,10 @@ export function FileUpload({ onDataLoaded, onTemplateDetected, currentTemplate, 
               sampleData: listings
             });
           } else {
-            // Regular data file - load normally
+            // Regular data file - accumulate listings
+            allListings.push(...listings);
+            filesProcessed++;
+
             // Show warnings if any
             if (warnings.length > 0) {
               const warningMsg = `⚠️ Import completed with warnings:\n\n${warnings.join('\n')}\n\nAdded ${listings.length} listing(s) from ${file.name}\n\nPlease review and fix these issues before exporting.`;
@@ -284,7 +292,11 @@ export function FileUpload({ onDataLoaded, onTemplateDetected, currentTemplate, 
               console.log(`✅ Successfully imported ${listings.length} listing(s) from ${file.name}`);
             }
 
-            onDataLoaded(listings);
+            // Only call onDataLoaded once all files are processed
+            if (filesProcessed === totalFiles) {
+              console.log(`📦 All ${totalFiles} file(s) processed. Total listings: ${allListings.length}`);
+              onDataLoaded(allListings);
+            }
           }
         } catch (error) {
           console.error('Error parsing file:', error);
