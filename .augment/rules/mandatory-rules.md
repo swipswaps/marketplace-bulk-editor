@@ -374,6 +374,58 @@ When the user says:
 - User explicitly requested using the existing window
 - "The error persists" means user already tested and saw failure
 
+---
+
+## Rule 24: Display Debug Info in UI, Not Console (CRITICAL)
+
+**When the user says:**
+- "save it yourself in the debug area at the bottom of the page"
+- "having the user (me) get it increases chance of error"
+- "why not display it in the UI?"
+
+**The assistant MUST:**
+1. **Add debug state to the relevant Context** (e.g., DataContext, AuthContext)
+2. **Create or use existing debug panel component** in the UI
+3. **Display all debug information automatically** without requiring user to open browser console
+4. **Show timestamps, log levels (info/warn/error/success), and data**
+
+**Forbidden Actions:**
+- Only logging to console.log without UI display
+- Requiring user to manually copy/paste console output
+- Creating debug logs that aren't visible in the UI
+- Ignoring existing debug panels
+
+**Why This Rule Exists:**
+- User shouldn't have to open browser console (F12)
+- Manual copy/paste increases chance of error
+- Debug info should be automatically captured and displayed
+- Following this instruction made short work of the "Failed to save to database" issue
+
+**Example Implementation:**
+```typescript
+// Context
+const [debugLogs, setDebugLogs] = useState<DebugLog[]>([]);
+const addDebugLog = (level, message, data) => {
+  setDebugLogs(prev => [...prev, { timestamp: new Date().toISOString(), level, message, data }]);
+  console.log(`${emoji} [${message}]`, data); // Also log to console
+};
+
+// UI Component
+{debugLogs.map((log, idx) => (
+  <div key={idx} className={getColorClass(log.level)}>
+    [{new Date(log.timestamp).toLocaleTimeString()}] {getEmoji(log.level)} {log.message}
+    {log.data && <pre>{JSON.stringify(log.data, null, 2)}</pre>}
+  </div>
+))}
+```
+
+**Real-World Success:**
+- User reported "Failed to save to database" error
+- Assistant added debug logging to DataContext
+- Debug panel showed: "⚠️ Skipping invalid listing 1" with data showing undefined values
+- Root cause identified immediately: empty row with undefined title/price/condition
+- Issue resolved by filtering invalid listings before sending to backend
+
 **Example Violation:**
 ```python
 # WRONG - Creates new browser
