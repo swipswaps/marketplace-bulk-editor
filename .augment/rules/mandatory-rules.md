@@ -167,6 +167,58 @@ Rationale: Visible mode allows user to see what's happening, verify behavior vis
 6. **Include console logs** captured via Chrome DevTools Protocol
 7. **Be taken in VISIBLE mode** (user can see browser window during test)
 
+### MANDATORY: Test Script with Evidence (HARD STOP)
+
+**Before claiming any feature is complete, the assistant MUST**:
+
+- [ ] Create test script (`test_*.py`) that runs in VISIBLE mode
+- [ ] Take screenshots at EVERY step (minimum 10 for complete workflow)
+- [ ] Use OCR to verify EVERY screenshot
+- [ ] **Display OCR output in terminal** (proof it was read)
+- [ ] Test COMPLETE workflow (not just page load)
+- [ ] Capture browser console logs
+- [ ] Show console log summary (total, errors, warnings)
+- [ ] Embed screenshots in README.md or evidence document
+- [ ] **Show terminal output proving all above steps were done**
+
+**If ANY item is unchecked, the feature is NOT complete.**
+
+**Example terminal output REQUIRED**:
+```
+STEP 1: Load page and verify UI
+📸 Screenshot saved: screenshots/01_page_loaded.png
+   File size: 1,234,567 bytes
+
+🔍 OCR Verification:
+   Extracted text (first 500 chars):
+   ----------------------------------------------------------------------------
+   Marketplace Bulk Editor
+   Upload Excel File
+   Backend Status: Connected
+   ----------------------------------------------------------------------------
+
+✅ Verification for Step 1:
+   ✅ Found: 'Marketplace Bulk Editor'
+   ✅ Found: 'Upload'
+   ✅ Found: 'Backend'
+
+📋 Browser Console Logs (Step 1):
+   Total entries: 5
+   Errors: 0
+   Warnings: 0
+```
+
+**This terminal output is PROOF that**:
+- Screenshot was actually taken (not just claimed)
+- OCR was actually run (not just claimed)
+- Text was actually verified (not just claimed)
+- Console logs were actually captured (not just claimed)
+- Feature actually works (not just claimed)
+
+**Without this evidence, claims of "it works" are not credible.**
+
+**Why this matters**: See `WHY_SCREENSHOTS_MATTER.md` for full explanation of why the user repeatedly asks for screenshots and OCR verification.
+
 ### Complete Workflow Testing (Rule 22)
 
 **The assistant MUST test the COMPLETE workflow, not just initial page load.**
@@ -342,7 +394,7 @@ Factual
 
 No celebratory language.
 
-## Rule 23: Use Existing Browser Windows (CRITICAL)
+## Rule 23: Use Existing Browser Windows (CRITICAL) [DEPRECATED - See Rule 24]
 
 When the user says:
 - "use xdotool to find the open firefox window"
@@ -376,7 +428,51 @@ When the user says:
 
 ---
 
-## Rule 24: Display Debug Info in UI, Not Console (CRITICAL)
+## Rule 24: Test Before Push (HARD STOP)
+
+**NEVER push broken code.**
+
+**Before ANY git push, the assistant MUST**:
+
+1. ✅ Run dev server (`npm run dev`)
+2. ✅ Run Selenium test in VISIBLE mode
+3. ✅ Verify 0 critical errors in console logs
+4. ✅ Verify OCR finds expected text
+5. ✅ Show terminal output proving app works
+
+**If ANY item fails, FIX THE CODE before pushing.**
+
+**Example of VIOLATION**:
+```
+LLM: "I'll push the code now."
+User: "Did you test it?"
+LLM: "The test showed errors but I pushed anyway."
+User: "That's broken code! Don't push broken code!"
+```
+
+**Correct workflow**:
+```
+1. Make changes
+2. Run dev server
+3. Run Selenium test
+4. See errors in test output
+5. FIX THE ERRORS
+6. Run test again
+7. Verify 0 errors
+8. THEN push
+```
+
+**Why this matters**:
+- Pushing broken code breaks production
+- Users can't use broken code
+- Wastes time fixing later
+- Violates basic development practices
+
+**This is non-negotiable.**
+
+---
+
+## Rule 25: Display Debug Info in UI, Not Console (CRITICAL)
 
 **When the user says:**
 - "save it yourself in the debug area at the bottom of the page"
