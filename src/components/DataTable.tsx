@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Trash2, Plus, ArrowUpDown, ArrowUp, ArrowDown, Copy, Eye, MoreVertical, X } from 'lucide-react';
 import type { MarketplaceListing } from '../types';
 import { CONDITIONS } from '../types';
+import { validateListing } from '../utils/validation';
 
 type SortField = keyof MarketplaceListing | null;
 type SortDirection = 'asc' | 'desc' | null;
@@ -233,6 +234,25 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
     onUpdate([...data, newListing]);
   };
 
+  const handleRemoveEmptyRows = () => {
+    const validListings = data.filter(listing => {
+      const validation = validateListing(listing);
+      // Keep listings that have at least TITLE, PRICE, and CONDITION filled
+      return !validation.emptyTitle && !validation.zeroPrice && !validation.emptyCondition;
+    });
+
+    const removedCount = data.length - validListings.length;
+    if (removedCount > 0) {
+      if (confirm(`Remove ${removedCount} empty/invalid row(s)?`)) {
+        onUpdate(validListings);
+        setLastSaved(new Date().toLocaleTimeString());
+        setTimeout(() => setLastSaved(null), 2000);
+      }
+    } else {
+      alert('No empty rows to remove!');
+    }
+  };
+
   const handleColumnBulkEdit = (field: keyof MarketplaceListing, scope: 'all' | 'selected') => {
     // Open modal for text/number fields
     if (field === 'TITLE' || field === 'DESCRIPTION' || field === 'CATEGORY' || field === 'PRICE') {
@@ -404,6 +424,15 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
           >
             <Plus size={16} />
             Add New Listing
+          </button>
+
+          <button
+            onClick={handleRemoveEmptyRows}
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors shadow-sm"
+            title="Remove rows with missing required fields (TITLE, PRICE, CONDITION)"
+          >
+            <Trash2 size={16} />
+            Remove Empty Rows
           </button>
 
           {/* Bulk Actions */}
@@ -729,6 +758,8 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
                 {visibleColumns.TITLE && <td
                   className={`px-4 py-2 border-b dark:border-gray-700 cursor-text text-gray-900 dark:text-gray-100 ${
                     focusedCell?.id === listing.id && focusedCell?.field === 'TITLE' ? 'ring-2 ring-blue-500 ring-inset' : ''
+                  } ${
+                    validateListing(listing).emptyTitle ? 'bg-red-50 dark:bg-red-900/20 border-l-4 border-l-red-500' : ''
                   }`}
                   onClick={() => {
                     setFocusedCell({ id: listing.id, field: 'TITLE' });
@@ -774,6 +805,8 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
                 {visibleColumns.PRICE && <td
                   className={`px-4 py-2 border-b dark:border-gray-700 cursor-text text-gray-900 dark:text-gray-100 ${
                     focusedCell?.id === listing.id && focusedCell?.field === 'PRICE' ? 'ring-2 ring-blue-500 ring-inset' : ''
+                  } ${
+                    validateListing(listing).zeroPrice ? 'bg-yellow-50 dark:bg-yellow-900/20 border-l-4 border-l-yellow-500' : ''
                   }`}
                   onClick={() => {
                     setFocusedCell({ id: listing.id, field: 'PRICE' });
@@ -844,6 +877,8 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
                 {visibleColumns.CONDITION && <td
                   className={`px-4 py-2 border-b dark:border-gray-700 cursor-pointer text-gray-900 dark:text-gray-100 ${
                     focusedCell?.id === listing.id && focusedCell?.field === 'CONDITION' ? 'ring-2 ring-blue-500 ring-inset' : ''
+                  } ${
+                    validateListing(listing).emptyCondition || validateListing(listing).invalidCondition ? 'bg-red-50 dark:bg-red-900/20 border-l-4 border-l-red-500' : ''
                   }`}
                   onClick={() => {
                     setFocusedCell({ id: listing.id, field: 'CONDITION' });

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Download, X, AlertTriangle, ChevronDown, Database, FileSpreadsheet } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import type { MarketplaceListing, TemplateMetadata } from '../types';
-import { validateListings } from '../utils/validation';
+import { validateListings, validateListing } from '../utils/validation';
 import { useAuth } from '../contexts/AuthContext';
 import { apiClient } from '../utils/api';
 
@@ -31,8 +31,15 @@ export function ExportButton({ data, sortField, sortDirection, template, onPrevi
   }, [showPreview, data, sortField, sortDirection, reverseOrder]);
 
   const getSortedData = () => {
+    // Filter out invalid listings (missing required fields)
+    const validData = data.filter(listing => {
+      const validation = validateListing(listing);
+      // Only export listings with TITLE, PRICE, and CONDITION filled
+      return !validation.emptyTitle && !validation.zeroPrice && !validation.emptyCondition;
+    });
+
     // Sort data if a sort is active
-    const sortedData = [...data];
+    const sortedData = [...validData];
     if (sortField && sortDirection) {
       sortedData.sort((a, b) => {
         const aVal = a[sortField];
@@ -101,6 +108,14 @@ export function ExportButton({ data, sortField, sortDirection, template, onPrevi
     }
 
     const sortedData = getSortedData();
+
+    // Warn if invalid rows were skipped
+    const skippedCount = data.length - sortedData.length;
+    if (skippedCount > 0) {
+      if (!confirm(`${skippedCount} invalid row(s) will be skipped (missing TITLE, PRICE, or CONDITION). Continue export?`)) {
+        return;
+      }
+    }
 
     // Prepare data for export (remove id field)
     // eslint-disable-next-line @typescript-eslint/no-unused-vars

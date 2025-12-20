@@ -53,26 +53,36 @@ function containsProhibitedKeywords(text: string): { found: boolean; category: s
 export function validateListing(listing: MarketplaceListing): {
   emptyTitle: boolean;
   emptyDescription: boolean;
+  emptyCondition: boolean;
   zeroPrice: boolean;
+  invalidCondition: boolean;
   prohibited: { category: string; keyword: string } | null;
 } {
   const title = String(listing.TITLE || '').trim();
   const description = String(listing.DESCRIPTION || '').trim();
+  const condition = String(listing.CONDITION || '').trim();
   const price = Number(listing.PRICE || 0);
-  
+
   const emptyTitle = title === '';
   const emptyDescription = description === '';
+  const emptyCondition = condition === '';
   const zeroPrice = price === 0;
-  
+
+  // Validate condition against Facebook Marketplace allowed values
+  const validConditions = ['New', 'Used - Like New', 'Used - Good', 'Used - Fair'];
+  const invalidCondition = condition !== '' && !validConditions.includes(condition);
+
   // Check for prohibited keywords in title and description
   const titleCheck = containsProhibitedKeywords(title);
   const descCheck = containsProhibitedKeywords(description);
   const prohibited = titleCheck || descCheck;
-  
+
   return {
     emptyTitle,
     emptyDescription,
+    emptyCondition,
     zeroPrice,
+    invalidCondition,
     prohibited,
   };
 }
@@ -84,29 +94,39 @@ export function validateListings(listings: MarketplaceListing[]): ValidationResu
   const warnings: ValidationWarning[] = [];
   const emptyTitleIndices: number[] = [];
   const emptyDescIndices: number[] = [];
+  const emptyConditionIndices: number[] = [];
+  const invalidConditionIndices: number[] = [];
   const zeroPriceIndices: number[] = [];
   const prohibitedIndices: number[] = [];
   const prohibitedByCategory: Record<string, { indices: number[]; keywords: Set<string> }> = {};
-  
+
   listings.forEach((listing, index) => {
     const validation = validateListing(listing);
-    
+
     if (validation.emptyTitle) {
       emptyTitleIndices.push(index);
     }
-    
+
     if (validation.emptyDescription) {
       emptyDescIndices.push(index);
     }
-    
+
+    if (validation.emptyCondition) {
+      emptyConditionIndices.push(index);
+    }
+
+    if (validation.invalidCondition) {
+      invalidConditionIndices.push(index);
+    }
+
     if (validation.zeroPrice) {
       zeroPriceIndices.push(index);
     }
-    
+
     if (validation.prohibited) {
       prohibitedIndices.push(index);
       const { category, keyword } = validation.prohibited;
-      
+
       if (!prohibitedByCategory[category]) {
         prohibitedByCategory[category] = { indices: [], keywords: new Set() };
       }
@@ -114,7 +134,7 @@ export function validateListings(listings: MarketplaceListing[]): ValidationResu
       prohibitedByCategory[category].keywords.add(keyword);
     }
   });
-  
+
   // Add warnings for empty fields
   if (emptyTitleIndices.length > 0) {
     warnings.push({
@@ -124,7 +144,7 @@ export function validateListings(listings: MarketplaceListing[]): ValidationResu
       itemIndices: emptyTitleIndices,
     });
   }
-  
+
   if (emptyDescIndices.length > 0) {
     warnings.push({
       type: 'error',
@@ -133,7 +153,25 @@ export function validateListings(listings: MarketplaceListing[]): ValidationResu
       itemIndices: emptyDescIndices,
     });
   }
-  
+
+  if (emptyConditionIndices.length > 0) {
+    warnings.push({
+      type: 'error',
+      category: 'Required Field',
+      message: `${emptyConditionIndices.length} listing(s) missing CONDITION (required by Facebook)`,
+      itemIndices: emptyConditionIndices,
+    });
+  }
+
+  if (invalidConditionIndices.length > 0) {
+    warnings.push({
+      type: 'error',
+      category: 'Invalid Value',
+      message: `${invalidConditionIndices.length} listing(s) have invalid CONDITION (must be: New, Used - Like New, Used - Good, Used - Fair)`,
+      itemIndices: invalidConditionIndices,
+    });
+  }
+
   if (zeroPriceIndices.length > 0) {
     warnings.push({
       type: 'warning',
@@ -142,12 +180,12 @@ export function validateListings(listings: MarketplaceListing[]): ValidationResu
       itemIndices: zeroPriceIndices,
     });
   }
-  
+
   // Add warnings for prohibited items
   for (const [category, data] of Object.entries(prohibitedByCategory)) {
     const categoryName = category.charAt(0).toUpperCase() + category.slice(1);
     const keywordList = Array.from(data.keywords).join(', ');
-    
+
     warnings.push({
       type: 'error',
       category: 'Prohibited Item',
@@ -155,7 +193,7 @@ export function validateListings(listings: MarketplaceListing[]): ValidationResu
       itemIndices: data.indices,
     });
   }
-  
+
   return {
     isValid: warnings.filter(w => w.type === 'error').length === 0,
     warnings,

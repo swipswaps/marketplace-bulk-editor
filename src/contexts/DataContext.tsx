@@ -11,17 +11,26 @@ import type { MarketplaceListing } from '../types';
 
 type SyncStatus = 'idle' | 'syncing' | 'synced' | 'error' | 'offline';
 
+interface DebugLog {
+  timestamp: string;
+  level: 'info' | 'warn' | 'error' | 'success';
+  message: string;
+  data?: any;
+}
+
 interface DataContextType {
   listings: MarketplaceListing[];
   syncStatus: SyncStatus;
   lastSyncTime: Date | null;
   error: string | null;
   isSyncing: boolean;
+  debugLogs: DebugLog[];
   setListings: (listings: MarketplaceListing[]) => void;
   saveToDatabase: (listingsToSave: MarketplaceListing[]) => Promise<void>;
   loadFromDatabase: () => Promise<MarketplaceListing[]>;
   syncWithDatabase: () => Promise<void>;
   clearError: () => void;
+  clearDebugLogs: () => void;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -32,6 +41,29 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [debugLogs, setDebugLogs] = useState<DebugLog[]>([]);
+
+  const addDebugLog = (level: DebugLog['level'], message: string, data?: any) => {
+    const log: DebugLog = {
+      timestamp: new Date().toISOString(),
+      level,
+      message,
+      data,
+    };
+    setDebugLogs(prev => [...prev, log]);
+
+    // Also log to console
+    const emoji = { info: '🔵', warn: '⚠️', error: '❌', success: '✅' }[level];
+    if (data) {
+      console.log(`${emoji} [${message}]`, data);
+    } else {
+      console.log(`${emoji} [${message}]`);
+    }
+  };
+
+  const clearDebugLogs = () => {
+    setDebugLogs([]);
+  };
 
   // Load from localStorage on mount
   useEffect(() => {
@@ -63,7 +95,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [isAuthenticated]);
 
   const saveToDatabase = async (listingsToSave: MarketplaceListing[]) => {
+    addDebugLog('info', 'saveToDatabase: Starting save operation');
+    addDebugLog('info', 'saveToDatabase: isAuthenticated', isAuthenticated);
+    addDebugLog('info', 'saveToDatabase: listingsToSave.length', listingsToSave.length);
+
     if (!isAuthenticated) {
+      addDebugLog('error', 'saveToDatabase: Not authenticated');
       setError('Please login to save to database');
       return;
     }
@@ -73,22 +110,55 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
     try {
       // Transform frontend format (UPPERCASE) to backend format (lowercase)
-      const backendListings = listingsToSave.map(listing => ({
-        title: listing.TITLE,
-        price: listing.PRICE.toString(),
-        condition: listing.CONDITION,
-        description: listing.DESCRIPTION || '',
-        category: listing.CATEGORY || '',
-        offer_shipping: listing['OFFER SHIPPING'] || 'No',
-        source: 'manual',
-      }));
+      addDebugLog('info', 'saveToDatabase: Transforming listings');
+
+      const invalidListings: any[] = [];
+      const backendListings = listingsToSave
+        .filter((listing, idx) => {
+          // Filter out invalid listings
+          const isValid = listing.TITLE && listing.PRICE && listing.CONDITION;
+          if (!isValid) {
+            const invalidData = {
+              index: idx,
+              title: listing.TITLE,
+              price: listing.PRICE,
+              condition: listing.CONDITION,
+            };
+            invalidListings.push(invalidData);
+            addDebugLog('warn', `saveToDatabase: Skipping invalid listing ${idx}`, invalidData);
+          }
+          return isValid;
+        })
+        .map((listing) => {
+          return {
+            title: listing.TITLE,
+            price: listing.PRICE.toString(),
+            condition: listing.CONDITION,
+            description: listing.DESCRIPTION || '',
+            category: listing.CATEGORY || '',
+            offer_shipping: listing['OFFER SHIPPING'] || 'No',
+            source: 'manual',
+          };
+        });
+
+      addDebugLog('info', 'saveToDatabase: Valid listings to send', backendListings.length);
+      if (invalidListings.length > 0) {
+        addDebugLog('warn', `saveToDatabase: Skipped ${invalidListings.length} invalid listings`, invalidListings);
+      }
 
       // Send all listings to backend
-      await apiClient.post('/api/listings/bulk', { listings: backendListings });
+      addDebugLog('info', 'saveToDatabase: Sending to backend', { count: backendListings.length });
+      const response = await apiClient.post('/api/listings/bulk', { listings: backendListings });
+
+      addDebugLog('success', 'saveToDatabase: Success!', response);
       setSyncStatus('synced');
       setLastSyncTime(new Date());
     } catch (err) {
       const apiError = err as ApiError;
+      addDebugLog('error', 'saveToDatabase: Error caught', {
+        message: apiError.message,
+        error: err,
+      });
       setError(apiError.message || 'Failed to save to database');
       setSyncStatus('error');
       throw err;
@@ -191,11 +261,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
     lastSyncTime,
     error,
     isSyncing: syncStatus === 'syncing',
+    debugLogs,
     setListings,
     saveToDatabase,
     loadFromDatabase,
     syncWithDatabase,
     clearError,
+    clearDebugLogs,
   };
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
