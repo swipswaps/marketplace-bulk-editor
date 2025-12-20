@@ -3,7 +3,9 @@
  * Based on best practices from React community and official docs
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+import { API_BASE } from '../config';
+
+const API_BASE_URL = API_BASE;
 
 export interface ApiError {
   message: string;
