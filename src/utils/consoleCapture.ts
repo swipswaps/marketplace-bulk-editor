@@ -24,6 +24,7 @@ class ConsoleCapture {
 
   constructor() {
     this.interceptConsole();
+    this.interceptGlobalErrors();
   }
 
   private interceptConsole() {
@@ -50,6 +51,28 @@ class ConsoleCapture {
       this.originalConsole.info(...args);
       this.notifyListeners('info', args);
     };
+  }
+
+  private interceptGlobalErrors() {
+    // Capture unhandled errors (including network errors)
+    window.addEventListener('error', (event) => {
+      const message = event.error
+        ? `${event.error.name}: ${event.error.message}`
+        : event.message;
+
+      this.originalConsole.error('Unhandled error:', message);
+      this.notifyListeners('error', ['🚨 Unhandled Error:', message]);
+    });
+
+    // Capture unhandled promise rejections (fetch failures, etc.)
+    window.addEventListener('unhandledrejection', (event) => {
+      const reason = event.reason instanceof Error
+        ? `${event.reason.name}: ${event.reason.message}`
+        : String(event.reason);
+
+      this.originalConsole.error('Unhandled promise rejection:', reason);
+      this.notifyListeners('error', ['🚨 Network/Promise Error:', reason]);
+    });
   }
 
   private notifyListeners(level: ConsoleEntry['level'], args: any[]) {

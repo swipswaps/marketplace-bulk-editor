@@ -57,24 +57,38 @@ export class ApiClient {
     }
 
     try {
+      console.log(`🌐 API Request: ${options.method || 'GET'} ${url}`);
+
       const response = await fetch(url, {
         ...options,
         headers,
       });
 
+      console.log(`✅ API Response: ${response.status} ${response.statusText}`);
+
       // Handle 401 Unauthorized - try to refresh token
       if (response.status === 401 && this.refreshToken) {
+        console.log('🔄 Token expired, attempting refresh...');
         const refreshed = await this.refreshAccessToken();
         if (refreshed) {
+          console.log('✅ Token refreshed successfully');
           // Retry original request with new token
           headers['Authorization'] = `Bearer ${this.accessToken}`;
           const retryResponse = await fetch(url, { ...options, headers });
           return this.handleResponse<T>(retryResponse);
+        } else {
+          console.error('❌ Token refresh failed');
         }
       }
 
       return this.handleResponse<T>(response);
     } catch (error) {
+      console.error(`❌ API Request Failed: ${url}`, error);
+      console.error(`🔍 Error details:`, {
+        message: error instanceof Error ? error.message : String(error),
+        url,
+        method: options.method || 'GET',
+      });
       throw this.handleError(error);
     }
   }

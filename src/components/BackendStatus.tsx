@@ -34,6 +34,8 @@ export function BackendStatus({ className = '' }: BackendStatusProps) {
 
   const checkBackend = async () => {
     try {
+      console.log(`🔍 Checking backend at ${API_BASE}/`);
+
       const response = await fetch(`${API_BASE}/`, {
         method: 'GET',
         headers: { 'Accept': 'application/json' },
@@ -41,6 +43,7 @@ export function BackendStatus({ className = '' }: BackendStatusProps) {
 
       if (response.ok) {
         const data = await response.json();
+        console.log('✅ Backend connected:', data);
         setHealth({
           status: 'connected',
           message: 'Docker Backend Connected',
@@ -51,19 +54,31 @@ export function BackendStatus({ className = '' }: BackendStatusProps) {
         });
         setShowSetupGuide(false);
       } else {
+        console.error(`❌ Backend returned HTTP ${response.status}`);
         throw new Error(`HTTP ${response.status}`);
       }
     } catch (error) {
       const newAttempts = health.attempts + 1;
+      const errorMessage = error instanceof Error ? error.message : 'Connection failed';
+
+      console.error(`❌ Backend connection failed (attempt ${newAttempts}/3):`, errorMessage);
+      console.error('🔍 Error details:', {
+        url: `${API_BASE}/`,
+        error: error,
+        isGitHubPages: window.location.hostname.includes('github.io'),
+        hostname: window.location.hostname,
+      });
+
       setHealth({
         status: 'disconnected',
-        message: error instanceof Error ? error.message : 'Connection failed',
+        message: errorMessage,
         attempts: newAttempts,
         maxAttempts: 3,
       });
-      
+
       // Show setup guide after max attempts
       if (newAttempts >= 3) {
+        console.warn('⚠️ Max connection attempts reached, showing setup guide');
         setShowSetupGuide(true);
       }
     }
