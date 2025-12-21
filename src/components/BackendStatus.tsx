@@ -31,6 +31,20 @@ export function BackendStatus({ className = '' }: BackendStatusProps) {
   });
   const [isExpanded, setIsExpanded] = useState(false);
   const [showSetupGuide, setShowSetupGuide] = useState(false);
+  const [showNetworkHelp, setShowNetworkHelp] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  // Detect network access (not localhost)
+  const isNetworkAccess = typeof window !== 'undefined' &&
+    window.location.hostname !== 'localhost' &&
+    window.location.hostname !== '127.0.0.1';
+
+  // Platform-specific firewall commands
+  const isWindows = typeof navigator !== 'undefined' &&
+    navigator.userAgent.toLowerCase().includes('win');
+  const firewallCmd = isWindows
+    ? "New-NetFirewallRule -DisplayName 'Marketplace-Bulk-Editor' -Direction Inbound -Protocol TCP -LocalPort 5173,5000 -Action Allow"
+    : 'sudo firewall-cmd --add-port=5173/tcp --add-port=5000/tcp --permanent && sudo firewall-cmd --reload';
 
   const checkBackend = async () => {
     try {
@@ -148,6 +162,17 @@ export function BackendStatus({ className = '' }: BackendStatusProps) {
                   <span className="text-gray-600 dark:text-gray-400">Version:</span>
                   <span className="font-mono">{health.version}</span>
                 </div>
+
+                {/* Show network hostname badge if accessed from network */}
+                {isNetworkAccess && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600 dark:text-gray-400">Network:</span>
+                    <span className="font-mono text-blue-600 dark:text-blue-400">
+                      🌐 {window.location.hostname}
+                    </span>
+                  </div>
+                )}
+
                 <div className="mt-2">
                   <span className="text-gray-600 dark:text-gray-400 block mb-1">Available endpoints:</span>
                   <ul className="text-xs space-y-1 ml-4">
@@ -159,6 +184,62 @@ export function BackendStatus({ className = '' }: BackendStatusProps) {
                     ))}
                   </ul>
                 </div>
+
+                {/* Network Access Help (when accessed from network) */}
+                {isNetworkAccess && (
+                  <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                    <button
+                      onClick={() => setShowNetworkHelp(!showNetworkHelp)}
+                      className="w-full text-left text-sm text-blue-600 dark:text-blue-400 hover:underline select-text"
+                    >
+                      🔧 Network access help
+                    </button>
+                    {showNetworkHelp && (
+                      <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800">
+                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
+                          Can't connect from other devices?
+                        </p>
+                        <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">
+                          Your firewall may be blocking connections. Run this command in {isWindows ? 'PowerShell (as Admin)' : 'terminal'} to allow access on ports 5173 (frontend) and 5000 (backend):
+                        </p>
+                        <div className="relative">
+                          <code className="block p-2 bg-white dark:bg-gray-900 rounded text-xs font-mono pr-16 overflow-x-auto">
+                            {firewallCmd}
+                          </code>
+                          <button
+                            onClick={async () => {
+                              try {
+                                await navigator.clipboard.writeText(firewallCmd);
+                                setCopied(true);
+                                setTimeout(() => setCopied(false), 2000);
+                              } catch {
+                                // Fallback for older browsers
+                                const el = document.createElement('textarea');
+                                el.value = firewallCmd;
+                                document.body.appendChild(el);
+                                el.select();
+                                document.execCommand('copy');
+                                document.body.removeChild(el);
+                                setCopied(true);
+                                setTimeout(() => setCopied(false), 2000);
+                              }
+                            }}
+                            className="absolute top-2 right-2 px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 select-text"
+                            title="Copy to clipboard"
+                          >
+                            {copied ? '✓ Copied' : '📋 Copy'}
+                          </button>
+                        </div>
+                        <p className="text-xs text-gray-600 dark:text-gray-400 mt-3">
+                          After running, other devices on your network can access:<br />
+                          <strong className="text-gray-900 dark:text-gray-100">
+                            http://{window.location.hostname}:5173
+                          </strong>
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </>
             )}
 
@@ -167,33 +248,42 @@ export function BackendStatus({ className = '' }: BackendStatusProps) {
                 {isGitHubPages ? (
                   <>
                     <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
-                      🔒 Mixed Content Blocked
+                      🔌 Backend Not Connected
                     </p>
                     <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">
-                      GitHub Pages (HTTPS) cannot connect to localhost (HTTP) due to browser security.
+                      GitHub Pages (HTTPS) is trying to connect to localhost:5000 (HTTP).
                     </p>
                     <p className="text-xs font-medium text-gray-900 dark:text-gray-100 mb-2">
-                      To enable backend connection:
+                      Troubleshooting steps:
                     </p>
                     <ol className="text-xs text-gray-600 dark:text-gray-400 space-y-2 ml-4 list-decimal">
                       <li>
-                        Start your local backend:
+                        <strong>Start your local backend:</strong>
                         <code className="block mt-1 p-2 bg-gray-100 dark:bg-gray-900 rounded font-mono">
                           ./docker-start.sh
                         </code>
                       </li>
                       <li>
-                        Click the padlock icon 🔒 in the address bar
+                        <strong>Verify backend is running:</strong>
+                        <code className="block mt-1 p-2 bg-gray-100 dark:bg-gray-900 rounded font-mono">
+                          curl http://localhost:5000/
+                        </code>
+                        Should return: <code>{`{"status":"ok"}`}</code>
                       </li>
                       <li>
-                        Click "Disable protection for now" (Firefox) or "Site settings" → "Insecure content: Allow" (Chrome)
+                        <strong>Check browser console</strong> (F12) for specific error messages
                       </li>
                       <li>
-                        Reload this page - backend should connect
+                        <strong>If you see "Mixed Content" errors:</strong>
+                        <ul className="ml-4 mt-1 space-y-1">
+                          <li>• Modern browsers should allow HTTPS → localhost HTTP automatically</li>
+                          <li>• Try Firefox or Chrome (latest versions)</li>
+                          <li>• Check browser settings for "Block insecure content" and disable for this site</li>
+                        </ul>
                       </li>
                     </ol>
-                    <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-3">
-                      ⚠️ Only do this when browsing from your local machine with backend running
+                    <p className="text-xs text-blue-600 dark:text-blue-400 mt-3">
+                      💡 Localhost connections are considered secure by modern browsers (MDN 2025)
                     </p>
                   </>
                 ) : (
