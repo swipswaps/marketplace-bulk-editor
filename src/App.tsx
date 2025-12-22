@@ -21,7 +21,7 @@ type SortDirection = 'asc' | 'desc' | null;
 
 function App() {
   const { isAuthenticated } = useAuth();
-  const { listings: dataListings, setListings: setDataListings, saveToDatabase, loadFromDatabase, isSyncing, debugLogs, clearDebugLogs } = useData();
+  const { listings: dataListings, setListings: setDataListings, saveToDatabase, loadFromDatabase, cleanupDuplicates, isSyncing, debugLogs, clearDebugLogs } = useData();
 
   const [listings, setListings] = useState<MarketplaceListing[]>([]);
   const [sortField, setSortField] = useState<SortField>(null);
@@ -226,6 +226,36 @@ function App() {
     }
   };
 
+  // Cleanup Duplicates handler
+  const handleCleanupDuplicates = async () => {
+    if (!isAuthenticated) {
+      alert('Please login to cleanup duplicates');
+      return;
+    }
+
+    const confirmed = confirm(
+      'This will remove duplicate listings from the database, keeping only the most recent version of each.\n\n' +
+      'Duplicates are identified by having the same title (case-insensitive).\n\n' +
+      'Continue?'
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      const result = await cleanupDuplicates();
+      alert(
+        `✅ Cleanup complete!\n\n` +
+        `Removed: ${result.removed} duplicate(s)\n` +
+        `Remaining: ${result.remaining} listing(s)`
+      );
+    } catch (error) {
+      console.error('Failed to cleanup duplicates:', error);
+      alert('❌ Failed to cleanup duplicates. Please try again.');
+    }
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-900 transition-colors">
       {/* Header */}
@@ -333,6 +363,15 @@ function App() {
                 >
                   <Download size={16} />
                   {isSyncing ? 'Loading...' : 'Load'}
+                </button>
+                <button
+                  onClick={handleCleanupDuplicates}
+                  disabled={isSyncing}
+                  className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-white bg-orange-600 hover:bg-orange-700 disabled:bg-orange-400 disabled:cursor-not-allowed rounded-lg transition-colors shadow-sm select-text"
+                  title="Remove duplicate listings from database (keeps most recent)"
+                >
+                  <Trash2 size={16} />
+                  Cleanup
                 </button>
               </>
             )}

@@ -29,6 +29,7 @@ interface DataContextType {
   saveToDatabase: (listingsToSave: MarketplaceListing[]) => Promise<void>;
   loadFromDatabase: () => Promise<MarketplaceListing[]>;
   syncWithDatabase: () => Promise<void>;
+  cleanupDuplicates: () => Promise<{ removed: number; remaining: number }>;
   clearError: () => void;
   clearDebugLogs: () => void;
 }
@@ -83,6 +84,38 @@ export function DataProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('listings', JSON.stringify(newListings));
   }, []);
 
+  // Wrap syncWithDatabase in useCallback to fix dependency issue
+  const syncWithDatabase = useCallback(async () => {
+    if (!isAuthenticated) {
+      setSyncStatus('offline');
+      return;
+    }
+
+    // Silent sync - don't show loading state
+    try {
+      const response = await apiClient.get<{ listings: MarketplaceListing[] }>('/api/listings');
+      const dbListings = response.listings;
+
+      // Only update if database has newer data
+      if (dbListings.length > 0) {
+        // Use functional update to avoid stale closure (Bug #2 fix)
+        setListings(prevListings => {
+          const merged = mergeListings(prevListings, dbListings);
+          // Optimize comparison - check length first (Bug #3 fix)
+          if (merged.length !== prevListings.length || JSON.stringify(merged) !== JSON.stringify(prevListings)) {
+            return merged;
+          }
+          return prevListings;
+        });
+      }
+
+      setSyncStatus('synced');
+      setLastSyncTime(new Date());
+    } catch {
+      setSyncStatus('offline');
+    }
+  }, [isAuthenticated, setListings]);
+
   // Auto-sync every 30 seconds if authenticated
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -92,7 +125,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }, 30000); // 30 seconds
 
     return () => clearInterval(interval);
-  }, [isAuthenticated]);
+  }, [isAuthenticated, syncWithDatabase]);
 
   const saveToDatabase = async (listingsToSave: MarketplaceListing[]) => {
     addDebugLog('info', 'saveToDatabase: Starting save operation');
@@ -130,7 +163,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
           return isValid;
         })
         .map((listing) => {
-          return {
+          // Bug #1 fix: Include id field for upsert logic
+          const backendListing: any = {
             title: listing.TITLE,
             price: listing.PRICE.toString(),
             condition: listing.CONDITION,
@@ -139,6 +173,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
             offer_shipping: listing['OFFER SHIPPING'] || 'No',
             source: 'manual',
           };
+
+          // Include id if it exists (for update), omit if new (for create)
+          if (listing.id) {
+            backendListing.id = listing.id;
+          }
+
+          return backendListing;
         });
 
       addDebugLog('info', 'saveToDatabase: Valid listings to send', backendListings.length);
@@ -200,15 +241,17 @@ export function DataProvider({ children }: { children: ReactNode }) {
       }));
 
       // Check for conflicts with local data
-      if (listings.length > 0 && dbListings.length > 0) {
-        // For now, merge both (keep all unique listings)
-        const merged = mergeListings(listings, dbListings);
-        setListings(merged);
-        setSyncStatus('synced');
-        setLastSyncTime(new Date());
-        return merged;
-      } else if (dbListings.length > 0) {
-        setListings(dbListings);
+      // Bug #2 fix: Use functional update to avoid stale closure
+      if (dbListings.length > 0) {
+        setListings(prevListings => {
+          if (prevListings.length > 0) {
+            // Merge both (keep all unique listings)
+            return mergeListings(prevListings, dbListings);
+          } else {
+            // No local listings, just use database listings
+            return dbListings;
+          }
+        });
         setSyncStatus('synced');
         setLastSyncTime(new Date());
         return dbListings;
@@ -225,29 +268,50 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const syncWithDatabase = async () => {
+
+
+  const cleanupDuplicates = async (): Promise<{ removed: number; remaining: number }> => {
     if (!isAuthenticated) {
-      setSyncStatus('offline');
-      return;
+      throw new Error('Must be authenticated to cleanup duplicates');
     }
 
-    // Silent sync - don't show loading state
-    try {
-      const response = await apiClient.get<{ listings: MarketplaceListing[] }>('/api/listings');
-      const dbListings = response.listings;
+    addDebugLog('info', 'cleanupDuplicates: Starting cleanup');
+    setSyncStatus('syncing');
 
-      // Only update if database has newer data
-      if (dbListings.length > 0) {
-        const merged = mergeListings(listings, dbListings);
-        if (JSON.stringify(merged) !== JSON.stringify(listings)) {
-          setListings(merged);
-        }
-      }
+    try {
+      const response = await apiClient.post<{
+        message: string;
+        removed: number;
+        remaining: number;
+      }>('/api/admin/cleanup/duplicates');
+
+      addDebugLog('success', `cleanupDuplicates: ${response.message}`, {
+        removed: response.removed,
+        remaining: response.remaining
+      });
+
+      // CRITICAL: Clear local state BEFORE reloading from database
+      // This prevents merging clean database with dirty localStorage
+      setListings([]);
+
+      // Reload listings from database after cleanup
+      // This will now REPLACE (not merge) because local state is empty
+      await loadFromDatabase();
 
       setSyncStatus('synced');
       setLastSyncTime(new Date());
-    } catch {
-      setSyncStatus('offline');
+
+      return {
+        removed: response.removed,
+        remaining: response.remaining
+      };
+    } catch (err) {
+      const apiError = err as ApiError;
+      const errorMsg = apiError.message || 'Failed to cleanup duplicates';
+      setError(errorMsg);
+      setSyncStatus('error');
+      addDebugLog('error', `cleanupDuplicates: ${errorMsg}`, apiError);
+      throw err;
     }
   };
 
@@ -266,6 +330,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     saveToDatabase,
     loadFromDatabase,
     syncWithDatabase,
+    cleanupDuplicates,
     clearError,
     clearDebugLogs,
   };

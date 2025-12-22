@@ -19,6 +19,7 @@ from routes.listings import listings_bp
 from routes.templates import templates_bp
 from routes.ocr import ocr_bp
 from routes.export import export_bp
+from routes.admin import admin_bp
 
 
 def create_app(config_name=None):
@@ -68,6 +69,7 @@ def create_app(config_name=None):
     app.register_blueprint(templates_bp, url_prefix='/api/templates')
     app.register_blueprint(ocr_bp, url_prefix='/api/ocr')
     app.register_blueprint(export_bp, url_prefix='/api/export')
+    app.register_blueprint(admin_bp, url_prefix='/api/admin')
     
     # Health check endpoint
     @app.route('/health', methods=['GET'])
@@ -91,7 +93,8 @@ def create_app(config_name=None):
                 'listings': '/api/listings',
                 'templates': '/api/templates',
                 'ocr': '/api/ocr',
-                'export': '/api/export'
+                'export': '/api/export',
+                'admin': '/api/admin'
             }
         }), 200
     

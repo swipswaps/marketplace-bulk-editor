@@ -1,6 +1,7 @@
 """
 Listings routes
 """
+from datetime import datetime
 from flask import Blueprint, request, jsonify
 from marshmallow import ValidationError
 from models.user import db
@@ -152,48 +153,94 @@ def delete_listing(current_user, listing_id):
 @listings_bp.route('/bulk', methods=['POST'])
 @token_required
 def bulk_create_listings(current_user):
-    """Bulk create listings"""
+    """Bulk create/update listings (upsert)"""
     try:
         data = bulk_create_schema.load(request.json)
     except ValidationError as err:
         return jsonify({'error': 'Validation failed', 'details': err.messages}), 400
 
     created_listings = []
+    updated_listings = []
     errors = []
 
     for idx, listing_data in enumerate(data['listings']):
         try:
-            listing = Listing(
-                user_id=current_user.id,
-                title=listing_data['title'],
-                price=listing_data['price'],
-                condition=listing_data['condition'],
-                description=listing_data.get('description'),
-                category=listing_data.get('category'),
-                offer_shipping=listing_data.get('offer_shipping', 'No'),
-                source=listing_data.get('source', 'import'),
-                ocr_scan_id=listing_data.get('ocr_scan_id'),
-                extra_data=listing_data.get('extra_data')  # Fixed: was 'metadata' (Rule 16 - ORM reserved keyword)
-            )
-            db.session.add(listing)
-            created_listings.append(listing)
+            listing_id = listing_data.get('id')
+
+            if listing_id:
+                # Try to find existing listing (UPDATE)
+                listing = Listing.query.filter_by(
+                    id=listing_id,
+                    user_id=current_user.id
+                ).first()
+
+                if listing:
+                    # UPDATE existing listing
+                    listing.title = listing_data['title']
+                    listing.price = listing_data['price']
+                    listing.condition = listing_data['condition']
+                    listing.description = listing_data.get('description')
+                    listing.category = listing_data.get('category')
+                    listing.offer_shipping = listing_data.get('offer_shipping', 'No')
+                    listing.source = listing_data.get('source', 'manual')
+                    listing.ocr_scan_id = listing_data.get('ocr_scan_id')
+                    listing.extra_data = listing_data.get('extra_data')
+                    listing.updated_at = datetime.utcnow()
+                    updated_listings.append(listing)
+                else:
+                    # CREATE new listing (ID provided but doesn't exist)
+                    listing = Listing(
+                        user_id=current_user.id,
+                        title=listing_data['title'],
+                        price=listing_data['price'],
+                        condition=listing_data['condition'],
+                        description=listing_data.get('description'),
+                        category=listing_data.get('category'),
+                        offer_shipping=listing_data.get('offer_shipping', 'No'),
+                        source=listing_data.get('source', 'import'),
+                        ocr_scan_id=listing_data.get('ocr_scan_id'),
+                        extra_data=listing_data.get('extra_data')
+                    )
+                    db.session.add(listing)
+                    created_listings.append(listing)
+            else:
+                # CREATE new listing (no ID provided)
+                listing = Listing(
+                    user_id=current_user.id,
+                    title=listing_data['title'],
+                    price=listing_data['price'],
+                    condition=listing_data['condition'],
+                    description=listing_data.get('description'),
+                    category=listing_data.get('category'),
+                    offer_shipping=listing_data.get('offer_shipping', 'No'),
+                    source=listing_data.get('source', 'import'),
+                    ocr_scan_id=listing_data.get('ocr_scan_id'),
+                    extra_data=listing_data.get('extra_data')
+                )
+                db.session.add(listing)
+                created_listings.append(listing)
         except Exception as e:
             errors.append({'index': idx, 'error': str(e)})
 
     try:
         db.session.commit()
 
-        log_action(current_user.id, 'bulk_create_listings', 'listing', None, 201,
-                   metadata={'count': len(created_listings)})
+        creates = len(created_listings)
+        updates = len(updated_listings)
+
+        log_action(current_user.id, 'bulk_upsert_listings', 'listing', None, 201,
+                   metadata={'created': creates, 'updated': updates})
+
+        all_listings = created_listings + updated_listings
 
         return jsonify({
-            'message': f'{len(created_listings)} listings created successfully',
-            'listings': listings_schema.dump(created_listings),
+            'message': f'{creates} listings created, {updates} listings updated',
+            'listings': listings_schema.dump(all_listings),
             'errors': errors
         }), 201
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': 'Bulk create failed', 'details': str(e)}), 500
+        return jsonify({'error': 'Bulk upsert failed', 'details': str(e)}), 500
 
 
 @listings_bp.route('/bulk', methods=['DELETE'])
