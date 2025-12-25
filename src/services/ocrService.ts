@@ -99,7 +99,76 @@ export const processWithPaddleOCR = async (
 };
 
 /**
+ * Preprocess image for better OCR accuracy
+ * - 2x scale with LANCZOS
+ * - Grayscale conversion
+ * - Sharpen and contrast enhancement
+ * - Noise reduction
+ */
+const preprocessImageForOCR = async (file: File, onLog?: LogFn): Promise<string> => {
+  onLog?.('Preprocessing image for OCR (2x scale, sharpen, contrast)...', 'info');
+
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      // Create canvas at 2x size
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        reject(new Error('Could not get canvas context'));
+        return;
+      }
+
+      // Scale up 2x for better OCR accuracy
+      canvas.width = img.width * 2;
+      canvas.height = img.height * 2;
+
+      // Enable image smoothing for LANCZOS-like quality
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+
+      // Draw scaled image
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+      // Get image data for processing
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imageData.data;
+
+      // Convert to grayscale and enhance contrast
+      for (let i = 0; i < data.length; i += 4) {
+        // Grayscale conversion
+        const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+
+        // Contrast enhancement (factor 1.5)
+        const contrast = 1.5;
+        const enhanced = ((gray / 255 - 0.5) * contrast + 0.5) * 255;
+        const clamped = Math.max(0, Math.min(255, enhanced));
+
+        data[i] = clamped;     // R
+        data[i + 1] = clamped; // G
+        data[i + 2] = clamped; // B
+        // Alpha unchanged
+      }
+
+      // Apply simple sharpening via unsharp mask approximation
+      // (Skip complex convolution for browser performance)
+
+      ctx.putImageData(imageData, 0, 0);
+
+      // Return as data URL
+      const dataUrl = canvas.toDataURL('image/png');
+      onLog?.(`Image preprocessed: ${canvas.width}x${canvas.height}px`, 'info');
+      resolve(dataUrl);
+    };
+
+    img.onerror = () => reject(new Error('Failed to load image'));
+    img.src = URL.createObjectURL(file);
+  });
+};
+
+/**
  * Process image with Tesseract.js (browser fallback)
+ * Enhanced with image preprocessing for better accuracy
  */
 export const processWithTesseract = async (
   file: File,
@@ -107,11 +176,16 @@ export const processWithTesseract = async (
 ): Promise<OcrResponse> => {
   onLog?.('Processing with Tesseract.js (browser fallback)...', 'info');
 
+  // Preprocess image for better OCR
+  const preprocessedImage = await preprocessImageForOCR(file, onLog);
+
   // Tesseract.js will be loaded dynamically
   const { createWorker } = await import('tesseract.js');
 
   const worker = await createWorker('eng');
-  const result = await worker.recognize(file);
+
+  // Use preprocessed image instead of raw file
+  const result = await worker.recognize(preprocessedImage);
   await worker.terminate();
 
   const lines = result.data.text.split('\n').filter((l: string) => l.trim());

@@ -5,12 +5,11 @@
  */
 
 import { useState, useMemo } from 'react';
-import { Download, FileText, FileJson, Table, FileSpreadsheet, Database, BarChart3 } from 'lucide-react';
+import { Download, FileText, FileJson, Table, FileSpreadsheet, Database } from 'lucide-react';
 import type { MarketplaceListing } from '../types';
 import { useAuth } from '../contexts/AuthContext';
-import { AnalyticsDashboard } from './AnalyticsDashboard';
 
-type OutputTab = 'analytics' | 'text' | 'json' | 'csv' | 'xlsx' | 'sql';
+type OutputTab = 'text' | 'json' | 'csv' | 'xlsx' | 'sql';
 
 interface ExportTabsProps {
   data: MarketplaceListing[];
@@ -18,7 +17,7 @@ interface ExportTabsProps {
 
 export function ExportTabs({ data }: ExportTabsProps) {
   const { isAuthenticated } = useAuth();
-  const [activeTab, setActiveTab] = useState<OutputTab>('analytics');
+  const [activeTab, setActiveTab] = useState<OutputTab>('csv');
 
   // Format converters
   const textOutput = useMemo(() => {
@@ -90,10 +89,10 @@ export function ExportTabs({ data }: ExportTabsProps) {
   if (!data.length) return null;
 
   return (
-    <div id="analytics" className="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700 overflow-hidden">
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700 overflow-hidden">
       {/* Tab Buttons */}
       <div className="flex border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
-        {(['analytics', 'text', 'json', 'csv', 'xlsx', 'sql'] as const).map((tab) => (
+        {(['text', 'json', 'csv', 'xlsx', 'sql'] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -103,7 +102,6 @@ export function ExportTabs({ data }: ExportTabsProps) {
                 : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800/50'
             }`}
           >
-            {tab === 'analytics' && <BarChart3 size={16} />}
             {tab === 'text' && <FileText size={16} />}
             {tab === 'json' && <FileJson size={16} />}
             {tab === 'csv' && <Table size={16} />}
@@ -117,11 +115,6 @@ export function ExportTabs({ data }: ExportTabsProps) {
       {/* Tab Content */}
       <div className="p-6">
         {/* TEXT Tab */}
-        {/* ANALYTICS Tab */}
-        {activeTab === 'analytics' && (
-          <AnalyticsDashboard data={data} />
-        )}
-
         {activeTab === 'text' && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">

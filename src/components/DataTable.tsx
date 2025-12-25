@@ -464,7 +464,7 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
   }, [editingCell, focusedCell, data, visibleColumns, sortedData]);
 
   return (
-    <div className="overflow-x-auto">
+    <div id="data-table" className="overflow-x-auto">
       {/* Screen reader announcements for dynamic content */}
       <div aria-live="polite" aria-atomic="true" className="sr-only">
         {data.length} listing{data.length !== 1 ? 's' : ''} in table. {selectedRows.size > 0 ? `${selectedRows.size} selected.` : ''}
@@ -537,8 +537,8 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
               placeholder="Search listings... (supports multiple words)"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              aria-label="Search listings by title, description, category, condition, price, or shipping"
               className="w-full px-4 py-2 pr-10 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-              title="Search by title, description, category, condition, price, or shipping. Use multiple words to narrow results."
             />
             {searchQuery && (
               <button
@@ -617,6 +617,7 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
 
       <div className="overflow-x-auto">
         <table ref={tableRef} className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-sm" style={{ tableLayout: 'fixed', width: '100%' }}>
+          <caption className="sr-only">Marketplace listings table with {sortedData.length} items</caption>
           <colgroup>
             <col style={{ width: '50px' }} />
             {[
@@ -685,9 +686,9 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
                           setColumnActionMenu(columnActionMenu === field ? null : field);
                         }}
                         className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition-colors select-text"
-                        title="Column actions"
                         aria-label={`Column actions for ${field}`}
                         aria-expanded={columnActionMenu === field}
+                        aria-haspopup="menu"
                       >
                         <MoreVertical size={14} className="text-gray-500 dark:text-gray-400" aria-hidden="true" />
                       </button>

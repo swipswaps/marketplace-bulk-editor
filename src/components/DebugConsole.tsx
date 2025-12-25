@@ -78,7 +78,7 @@ export function DebugConsole() {
         <div className="flex items-center gap-3">
           <Terminal className="text-gray-600 dark:text-gray-400" size={20} />
           <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
-            Debug Console
+            Console
           </h3>
           <div className="flex items-center gap-2 text-xs">
             <span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-gray-700 dark:text-gray-300">

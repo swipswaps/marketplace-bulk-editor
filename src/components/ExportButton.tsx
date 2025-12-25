@@ -370,9 +370,10 @@ export function ExportButton({ data, sortField, sortDirection, template, onPrevi
           </div>
           <button
             onClick={() => setShowPreview(false)}
+            aria-label="Close export preview"
             className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors text-gray-700 dark:text-gray-300"
           >
-            <X size={20} />
+            <X size={20} aria-hidden="true" />
           </button>
         </div>
 
@@ -438,12 +439,12 @@ export function ExportButton({ data, sortField, sortDirection, template, onPrevi
           <table className="w-full border border-gray-300 dark:border-gray-700 text-sm">
             <thead className="bg-gray-100 dark:bg-gray-700">
               <tr>
-                <th className="border dark:border-gray-600 px-3 py-2 text-left font-medium text-gray-900 dark:text-gray-100">TITLE</th>
-                <th className="border dark:border-gray-600 px-3 py-2 text-left font-medium text-gray-900 dark:text-gray-100">PRICE</th>
-                <th className="border dark:border-gray-600 px-3 py-2 text-left font-medium text-gray-900 dark:text-gray-100">CONDITION</th>
-                <th className="border dark:border-gray-600 px-3 py-2 text-left font-medium text-gray-900 dark:text-gray-100">DESCRIPTION</th>
-                <th className="border dark:border-gray-600 px-3 py-2 text-left font-medium text-gray-900 dark:text-gray-100">CATEGORY</th>
-                <th className="border dark:border-gray-600 px-3 py-2 text-left font-medium text-gray-900 dark:text-gray-100">OFFER SHIPPING</th>
+                <th scope="col" className="border dark:border-gray-600 px-3 py-2 text-left font-medium text-gray-900 dark:text-gray-100">TITLE</th>
+                <th scope="col" className="border dark:border-gray-600 px-3 py-2 text-left font-medium text-gray-900 dark:text-gray-100">PRICE</th>
+                <th scope="col" className="border dark:border-gray-600 px-3 py-2 text-left font-medium text-gray-900 dark:text-gray-100">CONDITION</th>
+                <th scope="col" className="border dark:border-gray-600 px-3 py-2 text-left font-medium text-gray-900 dark:text-gray-100">DESCRIPTION</th>
+                <th scope="col" className="border dark:border-gray-600 px-3 py-2 text-left font-medium text-gray-900 dark:text-gray-100">CATEGORY</th>
+                <th scope="col" className="border dark:border-gray-600 px-3 py-2 text-left font-medium text-gray-900 dark:text-gray-100">OFFER SHIPPING</th>
               </tr>
             </thead>
             <tbody>
@@ -479,8 +480,9 @@ export function ExportButton({ data, sortField, sortDirection, template, onPrevi
         {/* Footer */}
         <div className="flex items-center justify-between p-6 border-t dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
           {/* Reverse Order Checkbox */}
-          <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+          <label htmlFor="reverse-order-checkbox" className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
             <input
+              id="reverse-order-checkbox"
               type="checkbox"
               checked={reverseOrder}
               onChange={(e) => setReverseOrder(e.target.checked)}
@@ -529,9 +531,11 @@ export function ExportButton({ data, sortField, sortDirection, template, onPrevi
       <button
         onClick={() => setShowExportMenu(!showExportMenu)}
         disabled={data.length === 0}
+        aria-label="Export options menu"
+        aria-expanded={showExportMenu}
         className="inline-flex items-center px-2 py-2 text-sm font-medium text-white bg-blue-600 rounded-r-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors shadow-sm border-l border-blue-500 select-text"
       >
-        <ChevronDown size={16} />
+        <ChevronDown size={16} aria-hidden="true" />
       </button>
 
       {/* Export Options Dropdown */}

@@ -497,10 +497,11 @@ export function FileUpload({ onDataLoaded, onTemplateDetected, currentTemplate, 
         <div className="space-y-3">
           {/* Option 1: Load sample data */}
           <button
+            type="button"
             onClick={handleLoadSampleData}
             className="w-full flex items-start gap-3 p-4 border-2 border-gray-300 dark:border-gray-600 rounded-lg hover:border-blue-500 dark:hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors text-left"
           >
-            <Table className="text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" size={20} />
+            <Table className="text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" size={20} aria-hidden="true" />
             <div>
               <p className="font-medium text-gray-900 dark:text-white">Load Sample Data Only</p>
               <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
@@ -511,10 +512,11 @@ export function FileUpload({ onDataLoaded, onTemplateDetected, currentTemplate, 
 
           {/* Option 2: Save as template */}
           <button
+            type="button"
             onClick={handleSaveAsTemplate}
             className="w-full flex items-start gap-3 p-4 border-2 border-gray-300 dark:border-gray-600 rounded-lg hover:border-green-500 dark:hover:border-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors text-left"
           >
-            <FileSpreadsheet className="text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" size={20} />
+            <FileSpreadsheet className="text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" size={20} aria-hidden="true" />
             <div>
               <p className="font-medium text-gray-900 dark:text-white">Save as Template Only</p>
               <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
@@ -525,12 +527,13 @@ export function FileUpload({ onDataLoaded, onTemplateDetected, currentTemplate, 
 
           {/* Option 3: Both */}
           <button
+            type="button"
             onClick={handleLoadBoth}
             className="w-full flex items-start gap-3 p-4 border-2 border-purple-300 dark:border-purple-600 rounded-lg hover:border-purple-500 dark:hover:border-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors text-left"
           >
             <div className="flex gap-1 flex-shrink-0 mt-0.5">
-              <FileSpreadsheet className="text-purple-600 dark:text-purple-400" size={16} />
-              <Table className="text-purple-600 dark:text-purple-400" size={16} />
+              <FileSpreadsheet className="text-purple-600 dark:text-purple-400" size={16} aria-hidden="true" />
+              <Table className="text-purple-600 dark:text-purple-400" size={16} aria-hidden="true" />
             </div>
             <div>
               <p className="font-medium text-gray-900 dark:text-white">Do Both</p>
@@ -615,7 +618,7 @@ export function FileUpload({ onDataLoaded, onTemplateDetected, currentTemplate, 
                 : 'border-gray-300 dark:border-gray-600 hover:border-blue-400 dark:hover:border-blue-500 hover:bg-gray-50 dark:hover:bg-gray-700/50'
             }`}
           >
-            <input {...getInputProps()} />
+            <input {...getInputProps()} aria-label="Upload Excel file for marketplace listings" />
             <Upload className={`mx-auto h-12 w-12 mb-4 transition-colors ${
               isDragActive ? 'text-blue-500' : 'text-gray-400 dark:text-gray-500'
             }`} />
@@ -653,9 +656,10 @@ export function FileUpload({ onDataLoaded, onTemplateDetected, currentTemplate, 
               </a>
               <button
                 onClick={() => setShowPreloadWarning(true)}
+                aria-label="Load sample Facebook Marketplace template"
                 className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
               >
-                <Download size={16} />
+                <Download size={16} aria-hidden="true" />
                 Use Sample Template
               </button>
             </div>

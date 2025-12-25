@@ -139,6 +139,7 @@ export function BackendStatus({ className = '' }: BackendStatusProps) {
           className="w-full flex items-center justify-between gap-2 select-text"
           aria-label={`Backend status: ${health.message}. Click to ${isExpanded ? 'collapse' : 'expand'} details.`}
           aria-expanded={isExpanded}
+          aria-controls="backend-status-details"
         >
           <div className="flex items-center gap-2">
             {getStatusIcon()}
@@ -152,7 +153,7 @@ export function BackendStatus({ className = '' }: BackendStatusProps) {
 
         {/* Expanded Details */}
         {isExpanded && (
-          <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 space-y-2 text-sm">
+          <div id="backend-status-details" className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 space-y-2 text-sm">
             <div className="flex justify-between">
               <span className="text-gray-600 dark:text-gray-400">Connection attempts:</span>
               <span className="font-mono">{health.attempts} / {health.maxAttempts}</span>
@@ -226,8 +227,8 @@ export function BackendStatus({ className = '' }: BackendStatusProps) {
                                 setTimeout(() => setCopied(false), 2000);
                               }
                             }}
+                            aria-label="Copy firewall command to clipboard"
                             className="absolute top-2 right-2 px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 select-text"
-                            title="Copy to clipboard"
                           >
                             {copied ? '✓ Copied' : '📋 Copy'}
                           </button>
