@@ -1,6 +1,23 @@
 import { useState, useEffect, useRef } from 'react';
-import { Trash2, Plus, ArrowUpDown, ArrowUp, ArrowDown, Copy, Eye, MoreVertical, X } from 'lucide-react';
+import { Trash2, Plus, ArrowUpDown, ArrowUp, ArrowDown, Copy, Eye, MoreVertical, X, ExternalLink } from 'lucide-react';
 import type { MarketplaceListing } from '../types';
+
+// Helper to generate search URLs for price comparison
+const generateSearchUrls = (title: string) => {
+  // Clean up title for search query - remove special chars, limit length
+  const cleanTitle = title
+    .replace(/[^\w\s]/g, ' ')  // Remove special characters
+    .replace(/\s+/g, ' ')       // Collapse multiple spaces
+    .trim()
+    .slice(0, 80);              // Limit length for URL
+
+  const encoded = encodeURIComponent(cleanTitle);
+
+  return {
+    ebay: `https://www.ebay.com/sch/i.html?_nkw=${encoded}&_sop=12`,  // Sort by price + shipping
+    amazon: `https://www.amazon.com/s?k=${encoded}&s=price-asc-rank`, // Sort by price low to high
+  };
+};
 import { CONDITIONS } from '../types';
 import { validateListing } from '../utils/validation';
 
@@ -33,6 +50,7 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
   const [showPriceDropdown, setShowPriceDropdown] = useState(false);
   const [priceDropdownPosition, setPriceDropdownPosition] = useState<{ top: number; left: number; width: number } | null>(null);
   const priceInputRef = useRef<HTMLInputElement>(null);
+  const [compareDropdown, setCompareDropdown] = useState<string | null>(null); // Track which listing has compare dropdown open
   const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>({
     TITLE: true,
     PRICE: true,
@@ -408,6 +426,20 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
       return () => document.removeEventListener('click', handleClickOutside);
     }
   }, [columnActionMenu]);
+
+  // Close compare dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (_e: MouseEvent) => {
+      if (compareDropdown) {
+        setCompareDropdown(null);
+      }
+    };
+
+    if (compareDropdown) {
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [compareDropdown]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -1114,7 +1146,7 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => handleDuplicate(listing.id)}
-                      className="p-1 text-blue-600 hover:bg-blue-50 rounded select-text"
+                      className="p-1 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded select-text"
                       title="Duplicate"
                       aria-label={`Duplicate listing: ${listing.TITLE}`}
                     >
@@ -1122,12 +1154,54 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
                     </button>
                     <button
                       onClick={() => handleDelete(listing.id)}
-                      className="p-1 text-red-600 hover:bg-red-50 rounded select-text"
+                      className="p-1 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded select-text"
                       title="Delete"
                       aria-label={`Delete listing: ${listing.TITLE}`}
                     >
                       <Trash2 size={18} aria-hidden="true" />
                     </button>
+                    {/* Compare Prices Dropdown */}
+                    <div className="relative">
+                      <button
+                        onClick={() => setCompareDropdown(compareDropdown === listing.id ? null : listing.id)}
+                        className="p-1 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/30 rounded select-text"
+                        title="Compare Prices on eBay & Amazon"
+                        aria-label={`Compare prices for: ${listing.TITLE}`}
+                        aria-expanded={compareDropdown === listing.id}
+                        aria-haspopup="menu"
+                      >
+                        <ExternalLink size={18} aria-hidden="true" />
+                      </button>
+                      {compareDropdown === listing.id && (
+                        <div className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg z-50">
+                          <div className="py-1">
+                            <div className="px-3 py-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700">
+                              Compare Prices
+                            </div>
+                            <a
+                              href={generateSearchUrls(listing.TITLE || '').ebay}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={() => setCompareDropdown(null)}
+                              className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                            >
+                              <span className="w-5 h-5 flex items-center justify-center bg-yellow-400 text-black font-bold text-xs rounded">e</span>
+                              Search on eBay
+                            </a>
+                            <a
+                              href={generateSearchUrls(listing.TITLE || '').amazon}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={() => setCompareDropdown(null)}
+                              className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                            >
+                              <span className="w-5 h-5 flex items-center justify-center bg-orange-500 text-white font-bold text-xs rounded">a</span>
+                              Search on Amazon
+                            </a>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </td>
               </tr>
