@@ -193,7 +193,7 @@ For complete terms, see the [LICENSE](LICENSE) file.
 - 💾 **Smart Export**: Export to Facebook-compatible Excel format with sort order preserved
 - ✅ **Validation**: Real-time validation with warnings for missing/invalid data
 
-### Advanced UX Features (15 Total)
+### Advanced UX Features (17 Total)
 1. **Escape Key Cancel** - Press Escape to exit edit mode without saving
 2. **Sorted Column Highlight** - Visual feedback showing which column is sorted
 3. **Row Hover Effects** - Clear visual feedback when hovering over rows
@@ -209,6 +209,8 @@ For complete terms, see the [LICENSE](LICENSE) file.
 13. **Keyboard Navigation** - Navigate cells with Arrow keys, Tab, and Enter
 14. **Bulk Actions** - Select multiple rows for bulk delete or bulk edit
 15. **Undo/Redo** - Full undo/redo support with Ctrl+Z / Ctrl+Y (last 50 actions)
+16. **Navigation Controls** - Floating panel for quick jumping to sections (disabled by default, enable in Settings)
+17. **Analytics Dashboard** - Summary cards and interactive word cloud with click-to-filter
 
 ### Table Features
 - 🔀 **Column Sorting**: Click headers to sort (ascending → descending → none)
@@ -369,14 +371,34 @@ For complete terms, see the [LICENSE](LICENSE) file.
 ### Dark Mode
 
 **Toggling Dark Mode:**
-1. Click the **Moon/Sun icon** in the header
-2. Theme switches instantly
-3. Preference is **saved** and persists across sessions
+1. Click **Settings** (gear icon) in the header
+2. Toggle the **Dark Mode** switch
+3. Theme switches instantly
+4. Preference is **saved** and persists across sessions
 
 **Dark Mode Features:**
 - All UI elements adapt to dark theme
 - Reduced eye strain during long editing sessions
 - Automatic localStorage persistence
+
+### Navigation Controls
+
+**Enabling Navigation Controls:**
+1. Click **Settings** (gear icon) in the header
+2. Toggle the **Navigation Controls** switch
+3. A floating panel appears in the top-right corner
+
+**Using Navigation Controls:**
+- **Jump to Main Content** - Scroll to the main content area
+- **Jump to Data Table** - Scroll to the listings table
+- **Jump to Analytics** - Scroll to the analytics dashboard
+- **Jump to Debug Logs** - Scroll to debug console (if visible)
+
+**Closing Navigation Controls:**
+- Click the **X** button on the panel, or
+- Disable in **Settings** → **Navigation Controls**
+
+**Note:** Navigation Controls are disabled by default to keep the UI clean.
 
 ### Exporting Data
 

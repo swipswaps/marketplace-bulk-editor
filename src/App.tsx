@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { FileUpload } from './components/FileUpload';
 import { DataTable } from './components/DataTable';
 import { ExportButton } from './components/ExportButton';
@@ -43,22 +43,34 @@ function App() {
   const [hasUploadedFile, setHasUploadedFile] = useState(() => {
     return localStorage.getItem('hasUploadedFile') === 'true';
   });
+  // Navigation controls visibility - disabled by default, persisted to localStorage
+  const [showNavControls, setShowNavControls] = useState<boolean>(() => {
+    const saved = localStorage.getItem('showNavControls');
+    return saved ? JSON.parse(saved) : false;
+  });
 
   // Undo/Redo state
   const [history, setHistory] = useState<MarketplaceListing[][]>([]);
   const [historyIndex, setHistoryIndex] = useState<number>(-1);
 
-  // Sync local listings with DataContext
-  useEffect(() => {
-    if (dataListings.length > 0 && listings.length === 0) {
-      // Load from DataContext on mount
-      setListings(dataListings);
-    }
-  }, [dataListings, listings.length]);
+  // Sync local listings with DataContext (ONE-WAY ONLY - prevent circular dependency)
+  // Use ref to track if we've loaded initial data
+  const hasLoadedInitialDataRef = useRef(false);
 
-  // Update DataContext when listings change
   useEffect(() => {
-    if (listings.length > 0) {
+    // Load from DataContext ONLY ONCE when it has data and we haven't loaded yet
+    if (dataListings.length > 0 && !hasLoadedInitialDataRef.current) {
+      console.log('📥 Loading initial data from DataContext:', dataListings.length, 'listings');
+      setListings(dataListings);
+      hasLoadedInitialDataRef.current = true;
+    }
+  }, [dataListings]);
+
+  // Update DataContext when listings change (but NOT during initial load)
+  useEffect(() => {
+    // Only sync back to DataContext if we've already loaded initial data
+    if (hasLoadedInitialDataRef.current && listings.length > 0) {
+      console.log('📤 Syncing listings to DataContext:', listings.length, 'listings');
       setDataListings(listings);
     }
   }, [listings, setDataListings]);
@@ -81,6 +93,15 @@ function App() {
       localStorage.removeItem('fbTemplate');
     }
   }, [template]);
+
+  // Save navigation controls visibility to localStorage
+  useEffect(() => {
+    localStorage.setItem('showNavControls', JSON.stringify(showNavControls));
+  }, [showNavControls]);
+
+  const handleNavControlsToggle = () => {
+    setShowNavControls(prev => !prev);
+  };
 
   const handleTemplateLoad = (newTemplate: TemplateMetadata, isPreload = false) => {
     setTemplate(newTemplate);
@@ -259,6 +280,75 @@ function App() {
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-900 transition-colors">
+      {/* Navigation Controls - Hidden by default, toggleable from Settings */}
+      {showNavControls && (
+        <div className="fixed top-2 right-2 z-50 flex flex-col gap-2 bg-white dark:bg-gray-800 border-2 border-blue-500 rounded-lg p-3 shadow-lg">
+          <div className="flex items-center justify-between mb-1">
+            <div className="text-xs font-bold text-blue-600 dark:text-blue-400">NAVIGATION CONTROLS</div>
+            <button
+              onClick={() => setShowNavControls(false)}
+              className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+              aria-label="Close navigation controls"
+              title="Close (enable in Settings)"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </div>
+          <button
+            onClick={() => {
+              const el = document.getElementById('main-content');
+              if (el) {
+                const y = el.getBoundingClientRect().top + window.pageYOffset - 300;
+                window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
+              }
+            }}
+            className="px-3 py-2 text-sm font-medium bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-center"
+          >
+            Jump to Main Content
+          </button>
+          <button
+            onClick={() => {
+              const el = document.getElementById('data-table');
+              if (el) {
+                const y = el.getBoundingClientRect().top + window.pageYOffset - 300;
+                window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
+              }
+            }}
+            className="px-3 py-2 text-sm font-medium bg-green-600 text-white rounded hover:bg-green-700 transition-colors text-center"
+          >
+            Jump to Data Table
+          </button>
+          <button
+            onClick={() => {
+              const el = document.getElementById('analytics');
+              if (el) {
+                const y = el.getBoundingClientRect().top + window.pageYOffset - 300;
+                window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
+              }
+            }}
+            className="px-3 py-2 text-sm font-medium bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors text-center"
+          >
+            Jump to Analytics
+          </button>
+          <button
+            onClick={() => {
+              const el = document.getElementById('debug-logs');
+              if (el) {
+                const y = el.getBoundingClientRect().top + window.pageYOffset - 300;
+                window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
+                console.log('🔵 [NAVIGATION] Scrolled to debug-logs with 300px offset');
+              }
+            }}
+            className="px-3 py-2 text-sm font-medium bg-orange-600 text-white rounded hover:bg-orange-700 transition-colors text-center"
+          >
+            Jump to Debug Logs
+          </button>
+        </div>
+      )}
+
       {/* Skip to main content link for keyboard users */}
       <a
         href="#main-content"
@@ -318,10 +408,10 @@ function App() {
                 <button
                   onClick={handleUndo}
                   disabled={historyIndex <= 0}
+                  aria-label="Undo last change (Ctrl+Z)"
                   className="p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed select-text"
-                  title="Undo (Ctrl+Z)"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <path d="M3 7v6h6"/>
                     <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/>
                   </svg>
@@ -329,10 +419,10 @@ function App() {
                 <button
                   onClick={handleRedo}
                   disabled={historyIndex >= history.length - 1}
+                  aria-label="Redo last change (Ctrl+Y)"
                   className="p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed select-text"
-                  title="Redo (Ctrl+Y)"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <path d="M21 7v6h-6"/>
                     <path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7"/>
                   </svg>
@@ -342,10 +432,10 @@ function App() {
               {/* Settings Button */}
               <button
                 onClick={() => setShowSettings(true)}
+                aria-label="Open settings and legal notice"
                 className="p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors select-text"
-                title="Settings & Legal Notice"
               >
-                <Settings size={20} />
+                <Settings size={20} aria-hidden="true" />
               </button>
             </div>
           </div>
@@ -358,28 +448,28 @@ function App() {
                 <button
                   onClick={handleSaveToDatabase}
                   disabled={isSyncing || listings.length === 0}
+                  aria-label={`Save all ${listings.length} listing(s) to ${marketplace.toUpperCase()} database`}
                   className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-white bg-green-600 hover:bg-green-700 disabled:bg-green-400 disabled:cursor-not-allowed rounded-lg transition-colors shadow-sm select-text"
-                  title={`Save all ${listings.length} listing(s) to ${marketplace.toUpperCase()} database`}
                 >
-                  <Upload size={16} />
+                  <Upload size={16} aria-hidden="true" />
                   {isSyncing ? 'Saving...' : 'Save'}
                 </button>
                 <button
                   onClick={handleLoadFromDatabase}
                   disabled={isSyncing}
+                  aria-label={`Load listings from ${marketplace.toUpperCase()} database`}
                   className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed rounded-lg transition-colors shadow-sm select-text"
-                  title={`Load listings from ${marketplace.toUpperCase()} database`}
                 >
-                  <Download size={16} />
+                  <Download size={16} aria-hidden="true" />
                   {isSyncing ? 'Loading...' : 'Load'}
                 </button>
                 <button
                   onClick={handleCleanupDuplicates}
                   disabled={isSyncing}
+                  aria-label="Remove duplicate listings from database (keeps most recent)"
                   className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-white bg-orange-600 hover:bg-orange-700 disabled:bg-orange-400 disabled:cursor-not-allowed rounded-lg transition-colors shadow-sm select-text"
-                  title="Remove duplicate listings from database (keeps most recent)"
                 >
-                  <Trash2 size={16} />
+                  <Trash2 size={16} aria-hidden="true" />
                   Cleanup
                 </button>
               </>
@@ -398,10 +488,10 @@ function App() {
             {isAuthenticated && (
               <button
                 onClick={() => setShowOCRUpload(true)}
+                aria-label="Upload image for OCR processing"
                 className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors shadow-sm select-text"
-                title="Upload image for OCR processing (PaddleOCR)"
               >
-                <FileSpreadsheet size={16} />
+                <FileSpreadsheet size={16} aria-hidden="true" />
                 OCR
               </button>
             )}
@@ -411,10 +501,10 @@ function App() {
               <>
                 <button
                   onClick={handleClearAll}
+                  aria-label={`Clear all ${listings.length} listing(s) - this cannot be undone`}
                   className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-700 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors shadow-sm select-text"
-                  title={`Clear all ${listings.length} listing(s) - this cannot be undone!`}
                 >
-                  <Trash2 size={16} />
+                  <Trash2 size={16} aria-hidden="true" />
                   Clear All
                 </button>
                 <ExportButton
@@ -436,6 +526,8 @@ function App() {
         onClose={() => setShowSettings(false)}
         darkMode={darkMode}
         onDarkModeToggle={() => setDarkMode(!darkMode)}
+        showNavControls={showNavControls}
+        onNavControlsToggle={handleNavControlsToggle}
       />
 
       {/* Auth Modal */}
@@ -453,6 +545,7 @@ function App() {
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white">OCR Image Upload</h2>
                 <button
                   onClick={() => setShowOCRUpload(false)}
+                  aria-label="Close OCR upload modal"
                   className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
                 >
                   ✕
@@ -517,7 +610,7 @@ function App() {
           </div>
 
           {/* Debug Panels */}
-          <div className="mt-8 space-y-4">
+          <div id="debug-logs" className="space-y-4">
             {/* DataContext Debug Logs (Database operations) */}
             {debugLogs.length > 0 && (
               <div className="border border-gray-300 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900">
