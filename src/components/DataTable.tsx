@@ -515,8 +515,8 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
       </div>
 
       {/* Search and Actions Bar */}
-      <div className="mb-4 flex items-center justify-between gap-4">
-        <div className="flex items-center gap-4 flex-1">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
+        <div className="flex flex-wrap items-center gap-4 flex-1">
           <button
             onClick={handleAdd}
             className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors shadow-sm select-text"
@@ -574,11 +574,11 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
             </div>
           )}
 
-          {/* Search box */}
-          <div className="flex-1 max-w-md relative">
+          {/* Search box - responsive: full width on mobile, constrained on desktop */}
+          <div className="w-full sm:flex-1 sm:min-w-[200px] sm:max-w-md relative order-last sm:order-none mt-2 sm:mt-0">
             <input
               type="text"
-              placeholder="Search listings... (supports multiple words)"
+              placeholder="Search listings..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               aria-label="Search listings by title, description, category, condition, price, or shipping"
