@@ -1,7 +1,9 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Trash2, Plus, Copy, Eye, MoreVertical, X, ExternalLink } from 'lucide-react';
 import type { MarketplaceListing } from '../types';
+import { CONDITIONS } from '../types';
+import { validateListing } from '../utils/validation';
 
 // Helper to generate search URLs for price comparison
 const generateSearchUrls = (title: string) => {
@@ -21,8 +23,6 @@ const generateSearchUrls = (title: string) => {
     amazon: `https://www.amazon.com/s?k=${amazonEncoded}&s=price-asc-rank`, // Sort by price low to high
   };
 };
-import { CONDITIONS } from '../types';
-import { validateListing } from '../utils/validation';
 
 // Helper to check if a field was auto-filled during import
 const isFieldAutoFilled = (listing: MarketplaceListing, fieldName: keyof MarketplaceListing): boolean => {
@@ -121,16 +121,12 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
   useEffect(() => {
     if (!resizing) return;
 
-    console.log('Starting resize for column:', resizing.column);
-
     const handleMouseMove = (e: MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
 
       const delta = e.clientX - resizing.startX;
       const newWidth = Math.max(100, resizing.startWidth + delta); // Increased minimum from 80 to 100
-
-      console.log('Resizing:', { delta, newWidth, clientX: e.clientX, startX: resizing.startX });
 
       setColumnWidths(prev => ({
         ...prev,
@@ -152,7 +148,6 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
     const handleMouseUp = (e: MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      console.log('Resize ended');
       setResizing(null);
     };
 
@@ -185,7 +180,7 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
     }
   };
 
-  const handleCellUpdate = (id: string, field: keyof MarketplaceListing, value: string | number) => {
+  const handleCellUpdate = useCallback((id: string, field: keyof MarketplaceListing, value: string | number) => {
     const updatedData = data.map(item =>
       item.id === id ? { ...item, [field]: value } : item
     );
@@ -194,15 +189,15 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
     // Show save indicator
     setLastSaved(new Date().toLocaleTimeString());
     setTimeout(() => setLastSaved(null), 2000); // Hide after 2 seconds
-  };
+  }, [data, onUpdate]);
 
-  const handleDelete = (id: string) => {
+  const handleDelete = useCallback((id: string) => {
     if (confirm('Are you sure you want to delete this listing?')) {
       onUpdate(data.filter(item => item.id !== id));
     }
-  };
+  }, [data, onUpdate]);
 
-  const handleDuplicate = (id: string) => {
+  const handleDuplicate = useCallback((id: string) => {
     const listingToDuplicate = data.find(item => item.id === id);
     if (listingToDuplicate) {
       const duplicatedListing: MarketplaceListing = {
@@ -215,69 +210,36 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
       setLastSaved(new Date().toLocaleTimeString());
       setTimeout(() => setLastSaved(null), 2000);
     }
-  };
+  }, [data, onUpdate]);
 
-  const handleSelectAll = () => {
-    console.log('☑️ Select All checkbox clicked');
-    console.log(`📊 sortedData.length: ${sortedData.length}`);
-    console.log(`📊 selectedRows.size: ${selectedRows.size}`);
-
-    if (selectedRows.size === sortedData.length) {
-      console.log('✅ Deselecting all rows');
+  // Note: handleSelectAll and handleBulkDelete use sortedData/filteredData which are computed later
+  // These are intentionally not wrapped in useCallback since they depend on computed values
+  const handleSelectAll = (sortedDataArg: MarketplaceListing[]) => {
+    if (selectedRows.size === sortedDataArg.length) {
       setSelectedRows(new Set());
     } else {
-      const allIds = sortedData.map(item => item.id);
-      console.log(`✅ Selecting all ${allIds.length} rows`);
-      console.log(`📋 IDs: ${allIds.join(', ')}`);
+      const allIds = sortedDataArg.map(item => item.id);
       setSelectedRows(new Set(allIds));
     }
   };
 
   const handleBulkDelete = () => {
-    console.log('🗑️ Bulk Delete button clicked');
-    console.log(`📊 selectedRows.size: ${selectedRows.size}`);
-    console.log(`📊 data.length: ${data.length}`);
-    console.log(`📊 sortedData.length: ${sortedData.length}`);
-    console.log(`📊 filteredData.length: ${filteredData.length}`);
-
-    if (selectedRows.size === 0) {
-      console.log('❌ No rows selected, returning');
-      return;
-    }
-
-    console.log(`📋 Selected IDs: ${Array.from(selectedRows).join(', ')}`);
-
-    // Check positioning of selected rows
-    const selectedArray = Array.from(selectedRows);
-    console.log('📍 Position analysis:');
-    selectedArray.forEach(id => {
-      const dataIndex = data.findIndex(item => item.id === id);
-      const sortedIndex = sortedData.findIndex(item => item.id === id);
-      const filteredIndex = filteredData.findIndex(item => item.id === id);
-      console.log(`   ID ${id}: data[${dataIndex}], sortedData[${sortedIndex}], filteredData[${filteredIndex}]`);
-    });
+    if (selectedRows.size === 0) return;
 
     const userConfirmed = confirm(`Delete ${selectedRows.size} selected listing(s)?`);
-    console.log(`❓ User confirmed: ${userConfirmed}`);
 
     if (userConfirmed) {
       const updatedData = data.filter(item => !selectedRows.has(item.id));
-      console.log(`✅ Filtered data: ${data.length} → ${updatedData.length} (deleted ${data.length - updatedData.length})`);
-
       onUpdate(updatedData);
       setSelectedRows(new Set());
 
       // Show save indicator
       setLastSaved(new Date().toLocaleTimeString());
       setTimeout(() => setLastSaved(null), 2000);
-
-      console.log('✅ Bulk delete completed');
-    } else {
-      console.log('❌ Bulk delete cancelled by user');
     }
   };
 
-  const handleBulkEdit = (field: keyof MarketplaceListing, value: string | number) => {
+  const handleBulkEdit = useCallback((field: keyof MarketplaceListing, value: string | number) => {
     if (selectedRows.size === 0) return;
 
     const updatedData = data.map(item =>
@@ -288,9 +250,9 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
     // Show save indicator
     setLastSaved(new Date().toLocaleTimeString());
     setTimeout(() => setLastSaved(null), 2000);
-  };
+  }, [data, onUpdate, selectedRows]);
 
-  const handleAdd = () => {
+  const handleAdd = useCallback(() => {
     const newListing: MarketplaceListing = {
       id: crypto.randomUUID(),
       TITLE: '',
@@ -301,9 +263,9 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
       'OFFER SHIPPING': 'No'
     };
     onUpdate([...data, newListing]);
-  };
+  }, [data, onUpdate]);
 
-  const handleRemoveEmptyRows = () => {
+  const handleRemoveEmptyRows = useCallback(() => {
     const validListings = data.filter(listing => {
       const validation = validateListing(listing);
       // Keep listings that have at least TITLE, PRICE, and CONDITION filled
@@ -320,17 +282,17 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
     } else {
       alert('No empty rows to remove!');
     }
-  };
+  }, [data, onUpdate]);
 
-  const handleColumnBulkEdit = (field: keyof MarketplaceListing, scope: 'all' | 'selected') => {
+  const handleColumnBulkEdit = useCallback((field: keyof MarketplaceListing, scope: 'all' | 'selected') => {
     // Open modal for text/number fields
     if (field === 'TITLE' || field === 'DESCRIPTION' || field === 'CATEGORY' || field === 'PRICE') {
       setBulkEditModal({ show: true, field, scope, value: '' });
     }
     setColumnActionMenu(null);
-  };
+  }, []);
 
-  const handleApplyBulkEdit = () => {
+  const handleApplyBulkEdit = useCallback(() => {
     if (!bulkEditModal.field) return;
 
     const { field, scope, value } = bulkEditModal;
@@ -350,9 +312,9 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
     // Show save indicator
     setLastSaved(new Date().toLocaleTimeString());
     setTimeout(() => setLastSaved(null), 2000);
-  };
+  }, [bulkEditModal, data, onUpdate, selectedRows]);
 
-  const handleClearColumn = (field: keyof MarketplaceListing, scope: 'all' | 'selected') => {
+  const handleClearColumn = useCallback((field: keyof MarketplaceListing, scope: 'all' | 'selected') => {
     const defaultValue = field === 'PRICE' ? 0 : '';
 
     let updatedData: MarketplaceListing[];
@@ -377,7 +339,7 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
     setColumnActionMenu(null);
     setLastSaved(new Date().toLocaleTimeString());
     setTimeout(() => setLastSaved(null), 2000);
-  };
+  }, [data, onUpdate, selectedRows]);
 
   // Sort data
   // Filter data based on search query with fuzzy matching
@@ -418,7 +380,7 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
 
   // Close column action menu when clicking outside
   useEffect(() => {
-    const handleClickOutside = (_e: MouseEvent) => {
+    const handleClickOutside = () => {
       if (columnActionMenu) {
         setColumnActionMenu(null);
       }
@@ -682,7 +644,7 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
                 <input
                   type="checkbox"
                   checked={selectedRows.size === sortedData.length && sortedData.length > 0}
-                  onChange={handleSelectAll}
+                  onChange={() => handleSelectAll(sortedData)}
                   className="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
                 />
               </th>
@@ -792,7 +754,6 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
                       onMouseDown={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        console.log('🎯 Resize handle mousedown', field, 'colIndex:', colIndex);
                         setResizing({
                           column: field,
                           startX: e.clientX,

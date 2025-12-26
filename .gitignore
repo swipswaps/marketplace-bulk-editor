@@ -39,3 +39,9 @@ ADMIN_CREDENTIALS.md
 screenshot_*.png
 test_output.txt
 *.sql
+
+# Organized directories (local only)
+screenshots/
+tests/
+docs/
+.archive/

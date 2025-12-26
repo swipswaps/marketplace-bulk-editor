@@ -1,0 +1,175 @@
+{
+  "audit_date": "2025-12-26",
+  "version": "3.9",
+  "evidence_source": "Current conversation - scroll up to verify each citation",
+  "analysis": {
+    "session_patterns": {
+      "effective_prompts": [
+        {
+          "prompt": "without skipping any steps, evading @rules or repeating mistakes, proceed",
+          "evidence": {
+            "occurrence_1": "After ESLint fix summary, user said this to continue",
+            "occurrence_2": "After push authorization, user said this again",
+            "occurrence_3": "After workspace-guidelines update, user said this"
+          },
+          "effect": "Kept assistant on track, prevented scope creep, enforced rule compliance",
+          "promote_to_rule": true
+        },
+        {
+          "prompt": "reword requests",
+          "evidence": {
+            "occurrence_1": "After assistant asked 'Would you like me to: Push? Test? Something else?'",
+            "occurrence_2": "After second similar question pattern"
+          },
+          "meaning": "Clarify user intent and write efficacious prompt for compliance",
+          "effect": "Assistant restates understanding as clear actionable prompt, ensuring rule compliance",
+          "promote_to_rule": true
+        },
+        {
+          "prompt": "in fact do not @rules show that ./start.sh should be running",
+          "evidence": {
+            "context": "Assistant used 'npm run dev', got port conflicts",
+            "user_question": "does starting the dev server on a different port work?",
+            "correction": "User pointed out rules should specify ./start.sh"
+          },
+          "meaning": "Check project rules/scripts before using generic commands",
+          "effect": "Caught incorrect command usage, enforced project-specific best practices",
+          "promote_to_rule": true
+        }
+      ],
+      "ineffective_patterns": [
+        {
+          "pattern": "Asking 'Would you like me to: 1. X 2. Y 3. Z' at end of responses",
+          "evidence": "User said 'reword requests' at least 2 times (scroll up to verify)",
+          "problem": "User had to repeatedly say 'proceed' or 'reword requests'",
+          "waste": "2-3 extra round trips per task",
+          "fix": "New Rule 31: Action-First, Ask-Later"
+        },
+        {
+          "pattern": "Using 'npm run dev' without checking for project startup scripts",
+          "evidence": {
+            "terminal_output": "Port 5173 is in use, trying 5174... Port 5174 is in use, trying 5175",
+            "terminal_failures": ["Terminal 146 not found", "Terminal 1 not found"],
+            "user_correction": "in fact do not @rules show that ./start.sh should be running"
+          },
+          "problem": "Port conflicts, stray processes, no PID tracking",
+          "waste": "Multiple terminal timeouts, process cleanup",
+          "fix": "New Rule 32: Prefer Project Scripts"
+        },
+        {
+          "pattern": "Verbose explanations before/after simple actions",
+          "evidence": "Multiple long paragraphs explaining actions before/after (scroll up to see)",
+          "problem": "User scanning for actual results buried in text",
+          "waste": "Increased cognitive load, slower iteration",
+          "fix": "Rule 33: Concise Response Format"
+        }
+      ]
+    }
+  },
+  "new_rules": {
+    "rule_31": {
+      "name": "Action-First, Ask-Later (ANTI-QUESTION RULE)",
+      "version_added": "3.9",
+      "trigger": "User saying 'reword requests' or 'proceed'",
+      "description": "Do NOT end responses with multiple choice questions unless blocked. Just proceed with the logical next step.",
+      "forbidden": [
+        "Would you like me to: 1. X 2. Y 3. Z?",
+        "What would you like me to do next?",
+        "Should I proceed with X or Y?",
+        "Do you want me to..."
+      ],
+      "allowed_questions": [
+        "CLARIFICATION NEEDED: [specific blocker]",
+        "Permission required: [destructive action]",
+        "Ambiguous: [competing interpretations]"
+      ],
+      "rationale": "User repeatedly had to say 'proceed' - wasted round trips. Assume continuation unless blocked."
+    },
+    "rule_32": {
+      "name": "Prefer Project Scripts Over Generic Commands",
+      "version_added": "3.9",
+      "trigger": "Before running npm/yarn/python commands",
+      "description": "Check for project-specific scripts (start.sh, stop.sh, test.sh) before using generic commands.",
+      "workflow": [
+        "1. Check if project has scripts: ls -la *.sh",
+        "2. Read script to understand what it does",
+        "3. Use project script if it provides: cleanup, port management, PID tracking",
+        "4. Only use generic commands (npm run dev) if no project script exists"
+      ],
+      "examples": {
+        "wrong": "npm run dev",
+        "right": "./start.sh"
+      },
+      "rationale": "Project scripts handle edge cases (port conflicts, stray processes) that generic commands don't."
+    },
+    "rule_33": {
+      "name": "Concise Response Format",
+      "version_added": "3.9",
+      "description": "Minimize prose, maximize signal. Use structured format.",
+      "format": {
+        "step_header": "### Step N: [action]",
+        "rules": "**Rules:** [numbers only, e.g., '2, 26, 27']",
+        "command": "```bash\\n[command]\\n```",
+        "evidence": "**Evidence:** [1-2 line summary + raw output]",
+        "status": "✅ or ❌ [brief status]"
+      },
+      "forbidden": [
+        "Long explanations before actions",
+        "Repeating what was just done",
+        "Excessive context that user already knows"
+      ]
+    }
+  },
+  "upgraded_rules": {
+    "rule_0": {
+      "change": "Add 'Do not end with questions unless blocked' to workflow",
+      "before": "Just required per-step evidence",
+      "after": "Per-step evidence + auto-proceed to next step"
+    },
+    "rule_5": {
+      "change": "Clarify when questions ARE appropriate",
+      "before": "Ask when ambiguous",
+      "after": "Ask ONLY when: destructive action, true ambiguity, or missing critical info. NOT for 'what next?'"
+    }
+  },
+  "effective_user_prompts_to_document": [
+    {
+      "prompt": "without skipping any steps, evading @rules or repeating mistakes, proceed",
+      "use_when": "User wants assistant to continue working autonomously",
+      "effect": "Enforces all rules while continuing work",
+      "correct_interpretation": "Apply all rules per-step, provide evidence, don't ask unnecessary questions, continue to completion"
+    },
+    {
+      "prompt": "reword requests",
+      "use_when": "Assistant's understanding is unclear or prompt is ineffective",
+      "effect": "Assistant clarifies user intent and rewrites as efficacious prompt for compliance",
+      "correct_interpretation": "Parse user intent, restate as clear actionable prompt that will produce rule-compliant behavior",
+      "wrong_interpretation": "Stop asking questions (too narrow - it's about clarity, not silence)"
+    },
+    {
+      "prompt": "in fact do not @rules show that",
+      "use_when": "Assistant is not checking rules before acting",
+      "effect": "Forces assistant to verify rules first",
+      "correct_interpretation": "Check documented rules/scripts/config BEFORE taking action, quote relevant rule"
+    },
+    {
+      "prompt": "proceed",
+      "use_when": "After explanation, user wants action",
+      "effect": "Continue with implementation following rules",
+      "correct_interpretation": "Stop explaining, start doing - but still follow all rules with evidence"
+    },
+    {
+      "prompt": "when done, explain what I asked and what was done and show with evidence how it complies with the request",
+      "use_when": "User wants verification of compliance",
+      "effect": "Forces evidence-backed proof that work matches request",
+      "correct_interpretation": "Create compliance matrix: User Request → Action Taken → Evidence → Rule Satisfied"
+    },
+    {
+      "prompt": "without removing any features, proceed",
+      "use_when": "User is concerned about feature preservation during changes",
+      "effect": "Constraint (Rule 18) + continuation directive",
+      "correct_interpretation": "Acknowledge constraint, apply Rule 18 (Feature Removal Prohibition), proceed with implementation"
+    }
+  ]
+}
+

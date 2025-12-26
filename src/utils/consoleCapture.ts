@@ -8,7 +8,7 @@ export interface ConsoleEntry {
   timestamp: string;
   level: 'log' | 'error' | 'warn' | 'info';
   message: string;
-  args: any[];
+  args: unknown[];
 }
 
 type ConsoleListener = (entry: ConsoleEntry) => void;
@@ -29,25 +29,25 @@ class ConsoleCapture {
 
   private interceptConsole() {
     // Intercept console.log
-    console.log = (...args: any[]) => {
+    console.log = (...args: unknown[]) => {
       this.originalConsole.log(...args);
       this.notifyListeners('log', args);
     };
 
     // Intercept console.error
-    console.error = (...args: any[]) => {
+    console.error = (...args: unknown[]) => {
       this.originalConsole.error(...args);
       this.notifyListeners('error', args);
     };
 
     // Intercept console.warn
-    console.warn = (...args: any[]) => {
+    console.warn = (...args: unknown[]) => {
       this.originalConsole.warn(...args);
       this.notifyListeners('warn', args);
     };
 
     // Intercept console.info
-    console.info = (...args: any[]) => {
+    console.info = (...args: unknown[]) => {
       this.originalConsole.info(...args);
       this.notifyListeners('info', args);
     };
@@ -75,7 +75,7 @@ class ConsoleCapture {
     });
   }
 
-  private notifyListeners(level: ConsoleEntry['level'], args: any[]) {
+  private notifyListeners(level: ConsoleEntry['level'], args: unknown[]) {
     const entry: ConsoleEntry = {
       timestamp: new Date().toISOString(),
       level,
@@ -86,7 +86,7 @@ class ConsoleCapture {
     this.listeners.forEach(listener => listener(entry));
   }
 
-  private formatArgs(args: any[]): string {
+  private formatArgs(args: unknown[]): string {
     return args.map(arg => {
       if (typeof arg === 'string') return arg;
       if (arg instanceof Error) return `${arg.name}: ${arg.message}`;

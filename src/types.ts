@@ -11,8 +11,8 @@ export interface MarketplaceListing {
 
 export interface AutoFilledField {
   field: keyof MarketplaceListing;
-  originalValue: any; // The original value from import (null, undefined, empty string)
-  defaultValue: any; // The default value we filled in
+  originalValue: string | number | null | undefined; // The original value from import (null, undefined, empty string)
+  defaultValue: string | number; // The default value we filled in
   reason: string; // Human-readable reason (e.g., "Field was empty in imported file")
 }
 

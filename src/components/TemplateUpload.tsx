@@ -121,7 +121,7 @@ export function TemplateUpload({ onTemplateLoad, currentTemplate }: TemplateUplo
       });
 
       processTemplate(file, true); // Pass isPreload = true to trigger settings modal
-    } catch (err) {
+    } catch {
       setError('Failed to load preloaded template. Please upload your own template.');
       setIsProcessing(false);
     }

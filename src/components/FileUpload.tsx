@@ -141,7 +141,7 @@ export function FileUpload({ onDataLoaded, onTemplateDetected, currentTemplate, 
       });
 
       processTemplateFile(file, true);
-    } catch (err) {
+    } catch {
       setTemplateError('Failed to load preloaded template. Please upload your own template.');
     }
   };
@@ -379,7 +379,6 @@ export function FileUpload({ onDataLoaded, onTemplateDetected, currentTemplate, 
                 setValidationModal(validationResult);
               } else {
                 // All rows valid - import directly
-                console.log(`✅ Successfully imported ${validationResult.validCount} listing(s) from ${file.name}`);
                 onDataLoaded(allListingsFromValidation);
               }
             }
@@ -398,34 +397,29 @@ export function FileUpload({ onDataLoaded, onTemplateDetected, currentTemplate, 
   const handleImportAll = () => {
     if (!validationModal) return;
     const allListings = [...validationModal.valid, ...validationModal.autoFilled];
-    console.log(`✅ Imported ${allListings.length} listing(s) (${validationModal.autoFilledCount} with auto-filled fields)`);
     onDataLoaded(allListings);
     setValidationModal(null);
   };
 
   const handleImportValidOnly = () => {
     if (!validationModal) return;
-    console.log(`✅ Imported ${validationModal.validCount} valid listing(s) (skipped ${validationModal.autoFilledCount + validationModal.rejectedCount} rows)`);
     onDataLoaded(validationModal.valid);
     setValidationModal(null);
   };
 
   const handleCancelImport = () => {
-    console.log('❌ Import cancelled by user');
     setValidationModal(null);
   };
 
   const handleLoadSampleData = () => {
     onDataLoaded(templateModal.sampleData);
     setTemplateModal({ show: false, fileName: '', template: null, sampleData: [] });
-    console.log(`✅ Loaded ${templateModal.sampleData.length} sample listing(s) from template`);
   };
 
   const handleSaveAsTemplate = () => {
     if (templateModal.template && onTemplateDetected) {
       onTemplateDetected(templateModal.template, templateModal.sampleData);
       setTemplateModal({ show: false, fileName: '', template: null, sampleData: [] });
-      console.log(`✅ Saved template structure from ${templateModal.fileName}`);
     }
   };
 
@@ -434,7 +428,6 @@ export function FileUpload({ onDataLoaded, onTemplateDetected, currentTemplate, 
       onTemplateDetected(templateModal.template, templateModal.sampleData);
       onDataLoaded(templateModal.sampleData);
       setTemplateModal({ show: false, fileName: '', template: null, sampleData: [] });
-      console.log(`✅ Loaded template structure and ${templateModal.sampleData.length} sample listing(s)`);
     }
   };
 

@@ -1,4 +1,9 @@
-Mandatory LLM Execution Checklist (Machine-Checkable)
+---
+type: "always_apply"
+description: "Machine-checkable execution checklist - pre-flight validation, assumption control, evidence requirements, and stop-the-line conditions"
+---
+
+# Mandatory LLM Execution Checklist (Machine-Checkable)
 
 All steps must be evaluated in order.
 Failure at any STOP step halts execution immediately.

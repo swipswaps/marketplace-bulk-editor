@@ -71,7 +71,7 @@ export function AnalyticsDashboard({ data }: AnalyticsDashboardProps) {
     const stopWords = new Set(['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'is', 'it', 'as', 'be', 'are', 'was', 'were', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'must', 'shall', 'can', 'need', 'dare', 'ought', 'used', 'this', 'that', 'these', 'those', 'i', 'you', 'he', 'she', 'we', 'they', 'what', 'which', 'who', 'whom', 'where', 'when', 'why', 'how', 'all', 'each', 'every', 'both', 'few', 'more', 'most', 'other', 'some', 'such', 'no', 'nor', 'not', 'only', 'own', 'same', 'so', 'than', 'too', 'very', 's', 't', 'just', 'don', 'now', '-', '–', '/', '|', 'x', 'w']);
     data.forEach(item => {
       const title = String(item.TITLE || '').toLowerCase();
-      const words = title.split(/[\s\-\/\|,\.]+/).filter(w => w.length > 2 && !stopWords.has(w) && !/^\d+$/.test(w));
+      const words = title.split(/[\s\-/|,.]+/).filter(w => w.length > 2 && !stopWords.has(w) && !/^\d+$/.test(w));
       words.forEach(word => {
         wordCounts[word] = (wordCounts[word] || 0) + 1;
       });
