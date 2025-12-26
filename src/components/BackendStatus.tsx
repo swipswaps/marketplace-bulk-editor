@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { CheckCircle, XCircle, AlertCircle, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
 import { API_BASE, isGitHubPages } from '../config';
 
@@ -46,7 +46,7 @@ export function BackendStatus({ className = '' }: BackendStatusProps) {
     ? "New-NetFirewallRule -DisplayName 'Marketplace-Bulk-Editor' -Direction Inbound -Protocol TCP -LocalPort 5173,5000 -Action Allow"
     : 'sudo firewall-cmd --add-port=5173/tcp --add-port=5000/tcp --permanent && sudo firewall-cmd --reload';
 
-  const checkBackend = async () => {
+  const checkBackend = useCallback(async () => {
     try {
       console.log(`🔍 Checking backend at ${API_BASE}/`);
 
@@ -58,45 +58,47 @@ export function BackendStatus({ className = '' }: BackendStatusProps) {
       if (response.ok) {
         const data = await response.json();
         console.log('✅ Backend connected:', data);
-        setHealth({
+        setHealth(prev => ({
           status: 'connected',
           message: 'Docker Backend Connected',
           endpoints: data.endpoints,
           version: data.version,
-          attempts: health.attempts + 1,
+          attempts: prev.attempts + 1,
           maxAttempts: 3,
-        });
+        }));
         setShowSetupGuide(false);
       } else {
         console.error(`❌ Backend returned HTTP ${response.status}`);
         throw new Error(`HTTP ${response.status}`);
       }
     } catch (error) {
-      const newAttempts = health.attempts + 1;
       const errorMessage = error instanceof Error ? error.message : 'Connection failed';
 
-      console.error(`❌ Backend connection failed (attempt ${newAttempts}/3):`, errorMessage);
-      console.error('🔍 Error details:', {
-        url: `${API_BASE}/`,
-        error: error,
-        isGitHubPages: window.location.hostname.includes('github.io'),
-        hostname: window.location.hostname,
-      });
+      setHealth(prev => {
+        const newAttempts = prev.attempts + 1;
+        console.error(`❌ Backend connection failed (attempt ${newAttempts}/3):`, errorMessage);
+        console.error('🔍 Error details:', {
+          url: `${API_BASE}/`,
+          error: error,
+          isGitHubPages: window.location.hostname.includes('github.io'),
+          hostname: window.location.hostname,
+        });
 
-      setHealth({
-        status: 'disconnected',
-        message: errorMessage,
-        attempts: newAttempts,
-        maxAttempts: 3,
-      });
+        // Show setup guide after max attempts
+        if (newAttempts >= 3) {
+          console.warn('⚠️ Max connection attempts reached, showing setup guide');
+          setShowSetupGuide(true);
+        }
 
-      // Show setup guide after max attempts
-      if (newAttempts >= 3) {
-        console.warn('⚠️ Max connection attempts reached, showing setup guide');
-        setShowSetupGuide(true);
-      }
+        return {
+          status: 'disconnected',
+          message: errorMessage,
+          attempts: newAttempts,
+          maxAttempts: 3,
+        };
+      });
     }
-  };
+  }, []);
 
   useEffect(() => {
     // Initial check
@@ -106,7 +108,7 @@ export function BackendStatus({ className = '' }: BackendStatusProps) {
     const interval = setInterval(checkBackend, 10000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [checkBackend]);
 
   const getStatusIcon = () => {
     switch (health.status) {

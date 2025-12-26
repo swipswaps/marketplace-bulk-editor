@@ -28,6 +28,7 @@ export function ExportButton({ data, sortField, sortDirection, template, onPrevi
     if (onPreviewRender) {
       onPreviewRender(showPreview ? renderPreviewContent() : null);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- renderPreviewContent is stable, onPreviewRender is optional callback
   }, [showPreview, data, sortField, sortDirection, reverseOrder]);
 
   const getSortedData = () => {

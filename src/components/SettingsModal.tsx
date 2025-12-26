@@ -26,12 +26,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [hasAcceptedTerms, setHasAcceptedTerms] = useState(() => {
     return localStorage.getItem('termsAccepted') === 'true';
   });
+  // Use status enum pattern to avoid sync setState in useEffect
+  const [readmeStatus, setReadmeStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [readmeContent, setReadmeContent] = useState<string>('');
-  const [readmeLoading, setReadmeLoading] = useState(false);
   const [readmeError, setReadmeError] = useState<string | null>(null);
+  const [backendDocsStatus, setBackendDocsStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [backendDocsContent, setBackendDocsContent] = useState<string>('');
-  const [backendDocsLoading, setBackendDocsLoading] = useState(false);
   const [backendDocsError, setBackendDocsError] = useState<string | null>(null);
+
+  // Derived state for loading indicators
+  const readmeLoading = readmeStatus === 'loading';
+  const backendDocsLoading = backendDocsStatus === 'loading';
 
   const handleAcceptTerms = (accepted: boolean) => {
     setHasAcceptedTerms(accepted);
@@ -39,12 +44,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   // Fetch README from GitHub when Help tab is opened
+  // Use startTransition to avoid synchronous setState warning in effect
   useEffect(() => {
-    if (activeTab === 'help' && !readmeContent && !readmeLoading) {
-      setReadmeLoading(true);
-      setReadmeError(null);
+    if (activeTab !== 'help' || readmeStatus !== 'idle') return;
 
-      fetch('https://raw.githubusercontent.com/swipswaps/marketplace-bulk-editor/main/README.md')
+    const controller = new AbortController();
+
+    // Use microtask to defer the setState call
+    queueMicrotask(() => {
+      if (controller.signal.aborted) return;
+      setReadmeStatus('loading');
+
+      fetch('https://raw.githubusercontent.com/swipswaps/marketplace-bulk-editor/main/README.md', {
+        signal: controller.signal
+      })
         .then(response => {
           if (!response.ok) {
             throw new Error('Failed to fetch README');
@@ -52,24 +65,36 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           return response.text();
         })
         .then(text => {
-          setReadmeContent(text);
-          setReadmeLoading(false);
+          if (!controller.signal.aborted) {
+            setReadmeContent(text);
+            setReadmeStatus('success');
+          }
         })
         .catch(error => {
-          console.error('Error fetching README:', error);
-          setReadmeError('Failed to load documentation. Please visit the GitHub repository.');
-          setReadmeLoading(false);
+          if (!controller.signal.aborted && error.name !== 'AbortError') {
+            console.error('Error fetching README:', error);
+            setReadmeError('Failed to load documentation. Please visit the GitHub repository.');
+            setReadmeStatus('error');
+          }
         });
-    }
-  }, [activeTab, readmeContent, readmeLoading]);
+    });
+
+    return () => { controller.abort(); };
+  }, [activeTab, readmeStatus]);
 
   // Fetch Backend Documentation when Backend tab is opened
   useEffect(() => {
-    if (activeTab === 'backend' && !backendDocsContent && !backendDocsLoading) {
-      setBackendDocsLoading(true);
-      setBackendDocsError(null);
+    if (activeTab !== 'backend' || backendDocsStatus !== 'idle') return;
 
-      fetch('https://raw.githubusercontent.com/swipswaps/marketplace-bulk-editor/main/HOW_TO_USE_DOCKER_BACKEND.md')
+    const controller = new AbortController();
+
+    queueMicrotask(() => {
+      if (controller.signal.aborted) return;
+      setBackendDocsStatus('loading');
+
+      fetch('https://raw.githubusercontent.com/swipswaps/marketplace-bulk-editor/main/HOW_TO_USE_DOCKER_BACKEND.md', {
+        signal: controller.signal
+      })
         .then(response => {
           if (!response.ok) {
             throw new Error('Failed to fetch backend documentation');
@@ -77,16 +102,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           return response.text();
         })
         .then(text => {
-          setBackendDocsContent(text);
-          setBackendDocsLoading(false);
+          if (!controller.signal.aborted) {
+            setBackendDocsContent(text);
+            setBackendDocsStatus('success');
+          }
         })
         .catch(error => {
-          console.error('Error fetching backend docs:', error);
-          setBackendDocsError('Failed to load backend documentation. Please visit the GitHub repository.');
-          setBackendDocsLoading(false);
+          if (!controller.signal.aborted && error.name !== 'AbortError') {
+            console.error('Error fetching backend docs:', error);
+            setBackendDocsError('Failed to load backend documentation. Please visit the GitHub repository.');
+            setBackendDocsStatus('error');
+          }
         });
-    }
-  }, [activeTab, backendDocsContent, backendDocsLoading]);
+    });
+
+    return () => { controller.abort(); };
+  }, [activeTab, backendDocsStatus]);
 
   if (!isOpen) return null;
 
@@ -354,7 +385,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <ReactMarkdown
                     remarkPlugins={[remarkGfm]}
                     components={{
-                      a: ({ node, ...props }) => (
+                      a: ({ ...props }) => (
                         <a {...props} target="_blank" rel="noopener noreferrer" />
                       ),
                     }}
@@ -420,7 +451,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <ReactMarkdown
                     remarkPlugins={[remarkGfm]}
                     components={{
-                      a: ({ node, ...props }) => (
+                      a: ({ ...props }) => (
                         <a {...props} target="_blank" rel="noopener noreferrer" />
                       ),
                     }}

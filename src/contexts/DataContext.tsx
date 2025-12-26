@@ -11,11 +11,35 @@ import type { MarketplaceListing } from '../types';
 
 type SyncStatus = 'idle' | 'syncing' | 'synced' | 'error' | 'offline';
 
+// Backend listing format (lowercase keys, used for API communication)
+interface BackendListing {
+  id?: string;
+  title: string;
+  price: string;
+  condition: string;
+  description: string;
+  category: string;
+  offer_shipping: string;
+  source: string;
+}
+
+// Invalid listing data for debugging
+interface InvalidListingData {
+  index: number;
+  title: string;
+  price: number | string;
+  condition: string;
+}
+
+// Generic debug data type - intentionally broad for debug logging
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type DebugData = Record<string, any> | string | number | boolean | null | undefined;
+
 interface DebugLog {
   timestamp: string;
   level: 'info' | 'warn' | 'error' | 'success';
   message: string;
-  data?: any;
+  data?: DebugData;
 }
 
 interface DataContextType {
@@ -36,15 +60,65 @@ interface DataContextType {
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
+// Helper function to load and migrate listings from localStorage
+function loadListingsFromStorage(): MarketplaceListing[] {
+  const stored = localStorage.getItem('listings');
+  if (!stored) return [];
+
+  try {
+    const listings = JSON.parse(stored);
+
+    // MIGRATION: Filter out invalid listings and listings with lowercase fields
+    // (from old syncWithDatabase bug before transformation was added)
+    const validListings = listings.filter((listing: Partial<MarketplaceListing> & Record<string, unknown>) => {
+      // Check if listing has lowercase fields (incorrect format from old syncWithDatabase)
+      const hasLowercase = 'title' in listing && !('TITLE' in listing);
+      if (hasLowercase) {
+        console.warn('Removing listing with lowercase fields (old syncWithDatabase bug):', listing);
+        return false;
+      }
+
+      // Check if listing is valid (has non-empty TITLE, PRICE > 0, CONDITION)
+      const hasTitle = listing.TITLE && String(listing.TITLE).trim() !== '';
+      const hasPrice = listing.PRICE && Number(listing.PRICE) > 0;
+      const hasCondition = listing.CONDITION && String(listing.CONDITION).trim() !== '';
+      const isValid = hasTitle && hasPrice && hasCondition;
+
+      if (!isValid) {
+        console.warn('Removing invalid listing:', {
+          id: listing.id,
+          TITLE: listing.TITLE,
+          PRICE: listing.PRICE,
+          CONDITION: listing.CONDITION,
+          reason: !hasTitle ? 'empty TITLE' : !hasPrice ? 'zero/missing PRICE' : 'empty CONDITION'
+        });
+        return false;
+      }
+
+      return true;
+    });
+
+    if (validListings.length !== listings.length) {
+      localStorage.setItem('listings', JSON.stringify(validListings));
+    }
+
+    return validListings;
+  } catch (err) {
+    console.error('Failed to parse stored listings:', err);
+    return [];
+  }
+}
+
 export function DataProvider({ children }: { children: ReactNode }) {
   const { isAuthenticated } = useAuth();
-  const [listings, setListingsState] = useState<MarketplaceListing[]>([]);
+  // Use lazy initializer to load from localStorage - avoids setState in useEffect
+  const [listings, setListingsState] = useState<MarketplaceListing[]>(loadListingsFromStorage);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [debugLogs, setDebugLogs] = useState<DebugLog[]>([]);
 
-  const addDebugLog = (level: DebugLog['level'], message: string, data?: any) => {
+  const addDebugLog = (level: DebugLog['level'], message: string, data?: DebugData) => {
     const log: DebugLog = {
       timestamp: new Date().toISOString(),
       level,
@@ -65,55 +139,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const clearDebugLogs = () => {
     setDebugLogs([]);
   };
-
-  // Load from localStorage on mount
-  useEffect(() => {
-    const stored = localStorage.getItem('listings');
-    if (stored) {
-      try {
-        const listings = JSON.parse(stored);
-
-        // MIGRATION: Filter out invalid listings and listings with lowercase fields
-        // (from old syncWithDatabase bug before transformation was added)
-        const validListings = listings.filter((listing: any) => {
-          // Check if listing has lowercase fields (incorrect format from old syncWithDatabase)
-          const hasLowercase = 'title' in listing && !('TITLE' in listing);
-          if (hasLowercase) {
-            console.warn('Removing listing with lowercase fields (old syncWithDatabase bug):', listing);
-            return false;
-          }
-
-          // Check if listing is valid (has non-empty TITLE, PRICE > 0, CONDITION)
-          const hasTitle = listing.TITLE && String(listing.TITLE).trim() !== '';
-          const hasPrice = listing.PRICE && Number(listing.PRICE) > 0;
-          const hasCondition = listing.CONDITION && String(listing.CONDITION).trim() !== '';
-          const isValid = hasTitle && hasPrice && hasCondition;
-
-          if (!isValid) {
-            console.warn('Removing invalid listing:', {
-              id: listing.id,
-              TITLE: listing.TITLE,
-              PRICE: listing.PRICE,
-              CONDITION: listing.CONDITION,
-              reason: !hasTitle ? 'empty TITLE' : !hasPrice ? 'zero/missing PRICE' : 'empty CONDITION'
-            });
-            return false;
-          }
-
-          return true;
-        });
-
-        if (validListings.length !== listings.length) {
-          console.log(`Migration: Removed ${listings.length - validListings.length} invalid listings`);
-          localStorage.setItem('listings', JSON.stringify(validListings));
-        }
-
-        setListingsState(validListings);
-      } catch (err) {
-        console.error('Failed to parse stored listings:', err);
-      }
-    }
-  }, []);
 
   // Save to localStorage whenever listings change
   // Support both direct value and functional updates
@@ -216,13 +241,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
       // Transform frontend format (UPPERCASE) to backend format (lowercase)
       addDebugLog('info', 'saveToDatabase: Transforming listings');
 
-      const invalidListings: any[] = [];
+      const invalidListings: InvalidListingData[] = [];
       const backendListings = listingsToSave
         .filter((listing, idx) => {
           // Filter out invalid listings
           const isValid = listing.TITLE && listing.PRICE && listing.CONDITION;
           if (!isValid) {
-            const invalidData = {
+            const invalidData: InvalidListingData = {
               index: idx,
               title: listing.TITLE,
               price: listing.PRICE,
@@ -233,9 +258,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
           }
           return isValid;
         })
-        .map((listing) => {
+        .map((listing): BackendListing => {
           // Bug #1 fix: Include id field for upsert logic
-          const backendListing: any = {
+          const backendListing: BackendListing = {
+            id: listing.id || undefined,
             title: listing.TITLE,
             price: listing.PRICE.toString(),
             condition: listing.CONDITION,
@@ -244,11 +270,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
             offer_shipping: listing['OFFER SHIPPING'] || 'No',
             source: 'manual',
           };
-
-          // Include id if it exists (for update), omit if new (for create)
-          if (listing.id) {
-            backendListing.id = listing.id;
-          }
 
           return backendListing;
         });
@@ -262,7 +283,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       addDebugLog('info', 'saveToDatabase: Sending to backend', { count: backendListings.length });
       const response = await apiClient.post('/api/listings/bulk', { listings: backendListings });
 
-      addDebugLog('success', 'saveToDatabase: Success!', response);
+      addDebugLog('success', 'saveToDatabase: Success!', response as DebugData);
       setSyncStatus('synced');
       setLastSyncTime(new Date());
     } catch (err) {
@@ -431,6 +452,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useData() {
   const context = useContext(DataContext);
   if (context === undefined) {

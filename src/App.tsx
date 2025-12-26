@@ -1,8 +1,7 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { FileUpload } from './components/FileUpload';
 import { DataTable } from './components/DataTable';
 import { ExportButton } from './components/ExportButton';
-import { SettingsModal } from './components/SettingsModal';
 import { BackendStatus } from './components/BackendStatus';
 import { AuthModal } from './components/AuthModal';
 import { UserMenu } from './components/UserMenu';
@@ -17,6 +16,9 @@ import { useAuth } from './contexts/AuthContext';
 import { useData } from './contexts/DataContext';
 import './utils/consoleCapture'; // Initialize global console capture
 
+// Lazy load heavy components for better initial load performance
+const SettingsModal = lazy(() => import('./components/SettingsModal').then(m => ({ default: m.SettingsModal })));
+
 type SortField = keyof MarketplaceListing | null;
 type SortDirection = 'asc' | 'desc' | null;
 
@@ -24,7 +26,11 @@ function App() {
   const { isAuthenticated } = useAuth();
   const { listings: dataListings, setListings: setDataListings, saveToDatabase, loadFromDatabase, cleanupDuplicates, isSyncing, debugLogs, clearDebugLogs } = useData();
 
-  const [listings, setListings] = useState<MarketplaceListing[]>([]);
+  // Use dataListings directly from context - no need for duplicate local state
+  // This avoids the setState-in-useEffect anti-pattern
+  const listings = dataListings;
+  const setListings = setDataListings;
+
   const [sortField, setSortField] = useState<SortField>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>(null);
   const [darkMode, setDarkMode] = useState<boolean>(() => {
@@ -53,28 +59,6 @@ function App() {
   const [history, setHistory] = useState<MarketplaceListing[][]>([]);
   const [historyIndex, setHistoryIndex] = useState<number>(-1);
 
-  // Sync local listings with DataContext (ONE-WAY ONLY - prevent circular dependency)
-  // Use ref to track if we've loaded initial data
-  const hasLoadedInitialDataRef = useRef(false);
-
-  useEffect(() => {
-    // Load from DataContext ONLY ONCE when it has data and we haven't loaded yet
-    if (dataListings.length > 0 && !hasLoadedInitialDataRef.current) {
-      console.log('📥 Loading initial data from DataContext:', dataListings.length, 'listings');
-      setListings(dataListings);
-      hasLoadedInitialDataRef.current = true;
-    }
-  }, [dataListings]);
-
-  // Update DataContext when listings change (but NOT during initial load)
-  useEffect(() => {
-    // Only sync back to DataContext if we've already loaded initial data
-    if (hasLoadedInitialDataRef.current && listings.length > 0) {
-      console.log('📤 Syncing listings to DataContext:', listings.length, 'listings');
-      setDataListings(listings);
-    }
-  }, [listings, setDataListings]);
-
   // Apply dark mode class to document
   useEffect(() => {
     if (darkMode) {
@@ -99,11 +83,11 @@ function App() {
     localStorage.setItem('showNavControls', JSON.stringify(showNavControls));
   }, [showNavControls]);
 
-  const handleNavControlsToggle = () => {
+  const handleNavControlsToggle = useCallback(() => {
     setShowNavControls(prev => !prev);
-  };
+  }, []);
 
-  const handleTemplateLoad = (newTemplate: TemplateMetadata, isPreload = false) => {
+  const handleTemplateLoad = useCallback((newTemplate: TemplateMetadata, isPreload = false) => {
     setTemplate(newTemplate);
 
     // Show settings modal on first template preload (same as first file upload)
@@ -112,9 +96,9 @@ function App() {
       localStorage.setItem('hasUploadedFile', 'true');
       setShowSettings(true);
     }
-  };
+  }, [hasUploadedFile]);
 
-  const handleTemplateDetected = (template: TemplateMetadata, _sampleData: MarketplaceListing[]) => {
+  const handleTemplateDetected = useCallback((template: TemplateMetadata) => {
     // Save the template structure
     setTemplate(template);
 
@@ -124,12 +108,11 @@ function App() {
       localStorage.setItem('hasUploadedFile', 'true');
       setShowSettings(true);
     }
-  };
+  }, [hasUploadedFile]);
 
   const handleDataLoaded = (newData: MarketplaceListing[]) => {
     // Merge with existing data
     const updatedListings = [...listings, ...newData];
-    console.log(`📊 Data loaded: ${newData.length} new listings + ${listings.length} existing = ${updatedListings.length} total`);
     updateListingsWithHistory(updatedListings);
 
     // Show settings modal on first file upload
@@ -141,27 +124,15 @@ function App() {
   };
 
   const handleClearAll = () => {
-    console.log('🗑️ Clear All button clicked');
-    console.log(`📊 Current listings count: ${listings.length}`);
-
     const userConfirmed = confirm('Are you sure you want to clear all listings?');
-    console.log(`❓ User confirmed: ${userConfirmed}`);
 
     if (userConfirmed) {
-      console.log('✅ Clearing all listings...');
-
-      // Clear both local state AND DataContext to prevent useEffect from restoring data
       updateListingsWithHistory([]);
-      setDataListings([]);
-
-      console.log('✅ All listings cleared from both local state and DataContext');
-    } else {
-      console.log('❌ Clear All cancelled by user');
     }
   };
 
   // Update listings and add to history
-  const updateListingsWithHistory = (newListings: MarketplaceListing[]) => {
+  const updateListingsWithHistory = useCallback((newListings: MarketplaceListing[]) => {
     // Truncate history if we're not at the end
     const newHistory = history.slice(0, historyIndex + 1);
 
@@ -174,8 +145,7 @@ function App() {
     setHistory(newHistory);
     setHistoryIndex(newHistory.length - 1);
     setListings(newListings);
-    setDataListings(newListings);  // Also update DataContext to prevent restoration
-  };
+  }, [history, historyIndex, setListings]);
 
   // Undo handler
   const handleUndo = useCallback(() => {
@@ -184,7 +154,7 @@ function App() {
       setHistoryIndex(newIndex);
       setListings(history[newIndex]);
     }
-  }, [historyIndex, history]);
+  }, [historyIndex, history, setListings]);
 
   // Redo handler
   const handleRedo = useCallback(() => {
@@ -193,7 +163,7 @@ function App() {
       setHistoryIndex(newIndex);
       setListings(history[newIndex]);
     }
-  }, [historyIndex, history]);
+  }, [historyIndex, history, setListings]);
 
   // Keyboard shortcuts for undo/redo
   useEffect(() => {
@@ -339,7 +309,6 @@ function App() {
               if (el) {
                 const y = el.getBoundingClientRect().top + window.pageYOffset - 300;
                 window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
-                console.log('🔵 [NAVIGATION] Scrolled to debug-logs with 300px offset');
               }
             }}
             className="px-3 py-2 text-sm font-medium bg-orange-600 text-white rounded hover:bg-orange-700 transition-colors text-center"
@@ -520,15 +489,19 @@ function App() {
         </div>
       </header>
 
-      {/* Settings Modal */}
-      <SettingsModal
-        isOpen={showSettings}
-        onClose={() => setShowSettings(false)}
-        darkMode={darkMode}
-        onDarkModeToggle={() => setDarkMode(!darkMode)}
-        showNavControls={showNavControls}
-        onNavControlsToggle={handleNavControlsToggle}
-      />
+      {/* Settings Modal - Lazy loaded */}
+      {showSettings && (
+        <Suspense fallback={<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"><div className="text-white">Loading...</div></div>}>
+          <SettingsModal
+            isOpen={showSettings}
+            onClose={() => setShowSettings(false)}
+            darkMode={darkMode}
+            onDarkModeToggle={() => setDarkMode(!darkMode)}
+            showNavControls={showNavControls}
+            onNavControlsToggle={handleNavControlsToggle}
+          />
+        </Suspense>
+      )}
 
       {/* Auth Modal */}
       <AuthModal
