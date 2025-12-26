@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { Trash2, Plus, ArrowUpDown, ArrowUp, ArrowDown, Copy, Eye, MoreVertical, X, ExternalLink } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { Trash2, Plus, Copy, Eye, MoreVertical, X, ExternalLink } from 'lucide-react';
 import type { MarketplaceListing } from '../types';
 
 // Helper to generate search URLs for price comparison
@@ -11,11 +12,13 @@ const generateSearchUrls = (title: string) => {
     .trim()
     .slice(0, 80);              // Limit length for URL
 
-  const encoded = encodeURIComponent(cleanTitle);
+  // Use + for spaces in eBay URL (their preferred format)
+  const ebayEncoded = cleanTitle.replace(/\s+/g, '+');
+  const amazonEncoded = encodeURIComponent(cleanTitle);
 
   return {
-    ebay: `https://www.ebay.com/sch/i.html?_nkw=${encoded}&_sop=12`,  // Sort by price + shipping
-    amazon: `https://www.amazon.com/s?k=${encoded}&s=price-asc-rank`, // Sort by price low to high
+    ebay: `https://www.ebay.com/sch/i.html?_nkw=${ebayEncoded}&LH_Sold=1&_sop=16`,  // Sold items, sorted by price
+    amazon: `https://www.amazon.com/s?k=${amazonEncoded}&s=price-asc-rank`, // Sort by price low to high
   };
 };
 import { CONDITIONS } from '../types';
@@ -50,7 +53,7 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
   const [showPriceDropdown, setShowPriceDropdown] = useState(false);
   const [priceDropdownPosition, setPriceDropdownPosition] = useState<{ top: number; left: number; width: number } | null>(null);
   const priceInputRef = useRef<HTMLInputElement>(null);
-  const [compareDropdown, setCompareDropdown] = useState<string | null>(null); // Track which listing has compare dropdown open
+  const [compareDropdown, setCompareDropdown] = useState<{ id: string; position: { top: number; left: number } } | null>(null); // Track which listing has compare dropdown open + position
   const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>({
     TITLE: true,
     PRICE: true,
@@ -429,16 +432,25 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
 
   // Close compare dropdown when clicking outside
   useEffect(() => {
-    const handleClickOutside = (_e: MouseEvent) => {
-      if (compareDropdown) {
+    if (!compareDropdown) return;
+
+    const handleClickOutside = (e: MouseEvent) => {
+      // Check if click is outside the dropdown
+      const target = e.target as HTMLElement;
+      if (!target.closest('[data-compare-dropdown]')) {
         setCompareDropdown(null);
       }
     };
 
-    if (compareDropdown) {
-      document.addEventListener('click', handleClickOutside);
-      return () => document.removeEventListener('click', handleClickOutside);
-    }
+    // Delay adding listener to avoid catching the opening click
+    const timeoutId = setTimeout(() => {
+      document.addEventListener('mousedown', handleClickOutside);
+    }, 0);
+
+    return () => {
+      clearTimeout(timeoutId);
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
   }, [compareDropdown]);
 
   // Keyboard navigation
@@ -690,24 +702,16 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
                   style={{ position: 'relative', padding: 0 }}
                 >
                   <div style={{ display: 'flex', alignItems: 'stretch' }}>
-                    {/* Sortable header content */}
+                    {/* Sortable header content - click to sort, no arrows to save space */}
                     <div
-                      className={`flex items-center gap-1 cursor-pointer px-4 py-2 ${
-                        sortField === field ? 'font-semibold' : 'hover:text-blue-600'
+                      className={`flex items-center cursor-pointer px-4 py-2 ${
+                        sortField === field ? 'font-semibold text-blue-600' : 'hover:text-blue-600'
                       }`}
                       style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}
                       onClick={() => handleSort(field)}
+                      title={sortField === field ? `Sorted ${sortDirection === 'asc' ? 'ascending' : 'descending'} - click to change` : 'Click to sort'}
                     >
                       <span className="truncate">{label}</span>
-                      {sortField === field ? (
-                        sortDirection === 'asc' ? (
-                          <ArrowUp size={14} className="text-blue-600 flex-shrink-0" />
-                        ) : (
-                          <ArrowDown size={14} className="text-blue-600 flex-shrink-0" />
-                        )
-                      ) : (
-                        <ArrowUpDown size={14} className="text-gray-400 flex-shrink-0" />
-                      )}
                     </div>
 
                     {/* Column Action Menu Button */}
@@ -1161,46 +1165,30 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
                       <Trash2 size={18} aria-hidden="true" />
                     </button>
                     {/* Compare Prices Dropdown */}
-                    <div className="relative">
+                    <div className="relative" data-compare-dropdown>
                       <button
-                        onClick={() => setCompareDropdown(compareDropdown === listing.id ? null : listing.id)}
+                        onClick={(e) => {
+                          if (compareDropdown?.id === listing.id) {
+                            setCompareDropdown(null);
+                          } else {
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            setCompareDropdown({
+                              id: listing.id,
+                              position: {
+                                top: rect.bottom + 4,
+                                left: Math.max(8, rect.right - 192) // 192px = w-48, keep 8px from edge
+                              }
+                            });
+                          }
+                        }}
                         className="p-1 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/30 rounded select-text"
                         title="Compare Prices on eBay & Amazon"
                         aria-label={`Compare prices for: ${listing.TITLE}`}
-                        aria-expanded={compareDropdown === listing.id}
+                        aria-expanded={compareDropdown?.id === listing.id}
                         aria-haspopup="menu"
                       >
                         <ExternalLink size={18} aria-hidden="true" />
                       </button>
-                      {compareDropdown === listing.id && (
-                        <div className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg z-50">
-                          <div className="py-1">
-                            <div className="px-3 py-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700">
-                              Compare Prices
-                            </div>
-                            <a
-                              href={generateSearchUrls(listing.TITLE || '').ebay}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              onClick={() => setCompareDropdown(null)}
-                              className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                            >
-                              <span className="w-5 h-5 flex items-center justify-center bg-yellow-400 text-black font-bold text-xs rounded">e</span>
-                              Search on eBay
-                            </a>
-                            <a
-                              href={generateSearchUrls(listing.TITLE || '').amazon}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              onClick={() => setCompareDropdown(null)}
-                              className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                            >
-                              <span className="w-5 h-5 flex items-center justify-center bg-orange-500 text-white font-bold text-xs rounded">a</span>
-                              Search on Amazon
-                            </a>
-                          </div>
-                        </div>
-                      )}
                     </div>
                   </div>
                 </td>
@@ -1333,6 +1321,52 @@ Should show dropdown: ${showPriceDropdown && priceDropdownPosition && uniquePric
         )}
       </div>
 
+      {/* Compare Prices Dropdown - Rendered via Portal to avoid overflow clipping */}
+      {compareDropdown && createPortal(
+        <div
+          data-compare-dropdown
+          className="fixed w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg z-[9999]"
+          style={{
+            top: compareDropdown.position.top,
+            left: compareDropdown.position.left,
+          }}
+        >
+          <div className="py-1">
+            <div className="px-3 py-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700">
+              Compare Prices
+            </div>
+            {(() => {
+              const listing = data.find(item => item.id === compareDropdown.id);
+              const urls = generateSearchUrls(listing?.TITLE || '');
+              return (
+                <>
+                  <a
+                    href={urls.ebay}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => setCompareDropdown(null)}
+                    className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                  >
+                    <span className="w-5 h-5 flex items-center justify-center bg-yellow-400 text-black font-bold text-xs rounded">e</span>
+                    Search on eBay
+                  </a>
+                  <a
+                    href={urls.amazon}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => setCompareDropdown(null)}
+                    className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                  >
+                    <span className="w-5 h-5 flex items-center justify-center bg-orange-500 text-white font-bold text-xs rounded">a</span>
+                    Search on Amazon
+                  </a>
+                </>
+              );
+            })()}
+          </div>
+        </div>,
+        document.body
+      )}
 
     </div>
   );
