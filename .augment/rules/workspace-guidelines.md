@@ -135,9 +135,14 @@ for entry in driver.get_log('browser'):
 ### Starting Dev Server
 
 ```bash
-npm run dev
+./start.sh
+# Cleans up stray processes, clears ports 5173/5174, starts server
 # Server runs on http://localhost:5173
+# Logs: .vite.log
+# Stop with: ./stop.sh
 ```
+
+**Note:** Use `./start.sh` instead of `npm run dev` to avoid port conflicts and ensure clean startup.
 
 ### Building for Production
 
