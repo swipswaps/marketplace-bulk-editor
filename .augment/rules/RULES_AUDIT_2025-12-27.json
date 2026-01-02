@@ -1,0 +1,301 @@
+{
+  "audit_date": "2025-12-27",
+  "version": "4.2",
+  "supersedes": "RULES_AUDIT_2025-12-26.json",
+  "scope": [
+    "LLM request compliance",
+    "VSCode terminal-based workflows",
+    "Augment extension execution",
+    "Evidence-backed automation"
+  ],
+  "evidence_policy": "Evidence is mandatory. Absence of evidence is failure, not success.",
+  "global_invariants": {
+    "no_assumed_success": true,
+    "no_skipped_steps": true,
+    "no_truncated_evidence": true,
+    "no_hallucinated_output": true
+  },
+
+  "known_environment_failures": {
+    "augment_terminal_capture_failure": {
+      "id": "AUG-TTY-STDOUT-LOSS",
+      "detected_by": [
+        "command echoes present but no stdout",
+        "only '>' prompts shown",
+        "empty output where output is expected"
+      ],
+      "severity": "BLOCKING",
+      "required_response": [
+        "Declare BLOCKED",
+        "Do NOT claim compliance",
+        "Switch to file-based output capture",
+        "Re-run command with redirection"
+      ]
+    },
+    "terminal_session_exhaustion": {
+      "id": "AUG-TTY-SESSION-LEAK",
+      "detected_by": [
+        "terminal count > 10",
+        "completed terminals persist after kill",
+        "terminal IDs referenced that no longer exist"
+      ],
+      "severity": "CRITICAL",
+      "required_response": [
+        "Stop spawning new terminals",
+        "Reuse single terminal if possible",
+        "Recommend VSCode restart",
+        "Switch to non-terminal execution strategy"
+      ]
+    },
+    "output_truncation": {
+      "id": "AUG-TTY-TRUNCATION",
+      "detected_by": [
+        "partial logs",
+        "missing end-of-output markers",
+        "LLM summaries without raw output"
+      ],
+      "severity": "BLOCKING",
+      "required_response": [
+        "Declare evidence incomplete",
+        "Re-run with paging or file capture",
+        "Do NOT summarize in place of logs"
+      ]
+    }
+  },
+
+  "mandatory_execution_rules": {
+    "rule_01": {
+      "name": "Evidence-Before-Assertion",
+      "description": "The assistant MUST present raw evidence before claiming any step succeeded.",
+      "forbidden": [
+        "Assuming command success",
+        "Claiming compliance without logs",
+        "Stating 'this should work' as proof"
+      ]
+    },
+    "rule_02": {
+      "name": "Terminal Failure Detection",
+      "description": "If terminal output is missing, echoed-only, or truncated, the assistant MUST treat the step as FAILED.",
+      "action_on_violation": "Declare BLOCKED and stop progression"
+    },
+    "rule_03": {
+      "name": "File-Backed Output Fallback",
+      "trigger": "Any terminal output anomaly",
+      "required_pattern": [
+        "command > /tmp/command_output.txt 2>&1",
+        "cat /tmp/command_output.txt"
+      ],
+      "rationale": "File output bypasses terminal stdout capture bugs"
+    },
+    "rule_04": {
+      "name": "No Silent Continuation",
+      "description": "The assistant may NOT continue to subsequent steps if evidence for the current step is missing or invalid."
+    },
+    "rule_05": {
+      "name": "No Compliance by Narrative",
+      "description": "Narrative explanations do NOT count as evidence. Only raw outputs, files, diffs, or hashes do."
+    }
+  },
+
+  "terminal_hygiene_rules": {
+    "rule_10": {
+      "name": "Terminal Session Cap",
+      "max_sessions": 5,
+      "description": "If more than 5 terminals exist, the assistant must stop spawning new ones."
+    },
+    "rule_11": {
+      "name": "Single-Terminal Preference",
+      "description": "Reuse an existing terminal whenever possible instead of spawning new sessions."
+    },
+    "rule_12": {
+      "name": "Session Leak Detection",
+      "description": "If completed terminals persist, assume terminal subsystem failure."
+    }
+  },
+
+  "response_format_rules": {
+    "rule_20": {
+      "name": "Step-Gated Progression",
+      "required_format": [
+        "Step description",
+        "Command issued",
+        "Raw evidence",
+        "Pass/Fail status"
+      ],
+      "forbidden": [
+        "Skipping directly to conclusions",
+        "Combining multiple steps without evidence"
+      ]
+    },
+    "rule_21": {
+      "name": "Explicit BLOCKED State",
+      "description": "When blocked, the assistant MUST say 'BLOCKED' and explain why.",
+      "forbidden": [
+        "Soft language like 'might be an issue'",
+        "Continuing despite blockage"
+      ]
+    }
+  },
+
+  "anti_hallucination_rules": {
+    "rule_30": {
+      "name": "No Assumed User Environment",
+      "description": "Do not assume tools, files, or successful execution unless proven by evidence."
+    },
+    "rule_31": {
+      "name": "No False Request Compliance",
+      "description": "The assistant must not claim 'request satisfied' unless every requested element is evidenced."
+    }
+  },
+
+  "explicit_llm_instructions": {
+    "on_terminal_failure": [
+      "STOP",
+      "Declare BLOCKED",
+      "Switch to file-based capture",
+      "Request environment reset if needed"
+    ],
+    "on_missing_evidence": [
+      "Do NOT proceed",
+      "Do NOT summarize",
+      "Do NOT claim success"
+    ]
+  },
+
+  "compliance_checklist": [
+    "All steps executed?",
+    "All steps evidenced?",
+    "Any terminal anomalies detected?",
+    "Any assumptions made?",
+    "Any output truncated?",
+    "Was BLOCKED declared when required?"
+  ],
+
+  "final_assertion_rule": {
+    "name": "Proof or Silence",
+    "description": "If proof cannot be shown, the assistant must remain silent on success."
+  },
+
+  "testing_requirements_audit": {
+    "audit_trigger": "User question: 'do @rules not sufficiently require ./start.sh to be running instead of npm run dev for testing?'",
+    "audit_date": "2025-12-27",
+    "user_is_correct": true,
+    "findings": [
+      {
+        "issue_id": "TEST-001",
+        "severity": "HIGH",
+        "category": "Testing Requirements - Incomplete",
+        "description": "Rules mention ./start.sh but don't explicitly REQUIRE it for testing",
+        "current_state": {
+          "rule_32": "Mentions ./start.sh vs npm run dev",
+          "workspace_guidelines_line_145": "Note: Use ./start.sh instead of npm run dev",
+          "problem": "Not enforced as MANDATORY for testing"
+        },
+        "gap": "Rules don't explicitly state: BEFORE testing, MUST run ./start.sh (not npm run dev)",
+        "impact": "Assistant might use npm run dev instead of ./start.sh, causing port conflicts",
+        "recommendation": "Add to Rule 7: MANDATORY: ./start.sh must be running before testing"
+      },
+      {
+        "issue_id": "TEST-002",
+        "severity": "CRITICAL",
+        "category": "Backend Requirements - Missing",
+        "description": "Rules don't mention ./docker-start.sh requirement for backend testing",
+        "current_state": {
+          "workspace_guidelines": "No mention of ./docker-start.sh",
+          "mandatory_rules": "No mention of Docker backend requirement",
+          "problem": "Backend analytics charts require Docker containers (PostgreSQL, Redis, Flask)"
+        },
+        "gap": "Rules don't state: Backend features require ./docker-start.sh to be running",
+        "impact": "Assistant might test frontend-only features without starting backend, causing API errors",
+        "recommendation": "Add new Rule 33: Backend Testing Requirements (MANDATORY)"
+      },
+      {
+        "issue_id": "TEST-003",
+        "severity": "HIGH",
+        "category": "Testing Workflow - Incomplete",
+        "description": "Rules don't specify complete testing workflow for full-stack features",
+        "current_state": {
+          "rule_22": "Complete Workflow Testing - but doesn't mention Docker setup",
+          "workspace_guidelines": "Testing Requirements - but doesn't mention backend startup",
+          "problem": "No clear workflow: ./docker-start.sh → ./start.sh → test"
+        },
+        "gap": "Rules don't provide step-by-step testing workflow for full-stack features",
+        "impact": "Assistant might skip backend setup, test incomplete features, claim success without full workflow",
+        "recommendation": "Add to workspace-guidelines.md: Complete Testing Workflow section"
+      },
+      {
+        "issue_id": "TEST-004",
+        "severity": "MEDIUM",
+        "category": "Script Documentation - Incomplete",
+        "description": "Rules mention ./start.sh but don't document what it does vs npm run dev",
+        "current_state": {
+          "workspace_guidelines_line_138": "Comments: Cleans up stray processes, clears ports 5173/5174",
+          "problem": "Doesn't explain WHY this is better than npm run dev"
+        },
+        "gap": "Rules don't explain: ./start.sh handles port cleanup, PID tracking, log files",
+        "impact": "Assistant might not understand importance of using ./start.sh",
+        "recommendation": "Expand workspace-guidelines.md: Add comparison table"
+      }
+    ],
+    "proposed_fixes": [
+      {
+        "fix_id": "FIX-TEST-001",
+        "addresses": ["TEST-001", "TEST-002", "TEST-003"],
+        "action": "Update Rule 7 (Selenium Testing & Evidence Collection)",
+        "add_section": "MANDATORY Pre-Testing Setup",
+        "content": [
+          "BEFORE running ANY Selenium tests:",
+          "1. Check if backend features are being tested",
+          "2. If YES: Run ./docker-start.sh (starts PostgreSQL, Redis, Flask backend)",
+          "3. Verify containers: docker ps --filter 'name=marketplace-'",
+          "4. Run ./start.sh (starts Vite frontend on port 5173) - NOT npm run dev",
+          "5. Verify frontend: curl http://localhost:5173",
+          "6. ONLY THEN proceed with Selenium testing"
+        ]
+      },
+      {
+        "fix_id": "FIX-TEST-002",
+        "addresses": ["TEST-002"],
+        "action": "Add new Rule 33: Backend Testing Requirements",
+        "content": [
+          "BEFORE testing ANY backend features (auth, database, analytics, export):",
+          "1. MUST run ./docker-start.sh",
+          "2. MUST verify containers: docker ps --filter 'name=marketplace-'",
+          "3. MUST verify backend health: curl http://localhost:5000/api/health",
+          "4. MUST show container logs if errors occur",
+          "",
+          "Backend features include:",
+          "- User authentication (login, register)",
+          "- Database persistence (listings CRUD)",
+          "- Analytics API (/api/analytics/*)",
+          "- Export to SQL/JSON",
+          "- Rate limiting (Redis)",
+          "- Templates",
+          "",
+          "Forbidden:",
+          "- Testing backend features without Docker running",
+          "- Claiming backend works without showing API responses",
+          "- Skipping container verification"
+        ]
+      },
+      {
+        "fix_id": "FIX-TEST-003",
+        "addresses": ["TEST-003", "TEST-004"],
+        "action": "Expand workspace-guidelines.md: Development Server section",
+        "add_subsections": [
+          "Backend Setup (Docker)",
+          "Frontend Setup (Vite)",
+          "Complete Testing Workflow"
+        ]
+      }
+    ],
+    "summary": {
+      "total_issues": 4,
+      "critical": 1,
+      "high": 2,
+      "medium": 1,
+      "conclusion": "User is correct - rules mention ./start.sh but don't REQUIRE it for testing. Rules also completely miss ./docker-start.sh requirement for backend features."
+    }
+  }
+}
+

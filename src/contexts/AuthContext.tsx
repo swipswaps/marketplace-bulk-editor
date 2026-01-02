@@ -26,6 +26,7 @@ interface AuthContextType {
   register: (email: string, password: string, firstName: string, lastName: string) => Promise<void>;
   logout: () => void;
   clearError: () => void;
+  updateUser: (user: User) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -34,12 +35,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [accessToken, setAccessToken] = useState<string | null>(apiClient.getAccessToken());
 
   // Check if user is already logged in on mount
   useEffect(() => {
     const checkAuth = async () => {
       const token = apiClient.getAccessToken();
       if (token) {
+        setAccessToken(token);
         try {
           // Verify token is still valid by fetching user profile
           const userData = await apiClient.get<{ user: User }>('/api/auth/me');
@@ -47,6 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } catch {
           // Token is invalid, clear it
           apiClient.clearTokens();
+          setAccessToken(null);
         }
       }
       setIsLoading(false);
@@ -67,6 +71,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }>('/api/auth/login', { email, password });
 
       apiClient.setTokens(response.access_token, response.refresh_token);
+      setAccessToken(response.access_token);
       setUser(response.user);
     } catch (err) {
       const apiError = err as ApiError;
@@ -106,6 +111,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
 
       apiClient.setTokens(response.access_token, response.refresh_token);
+      setAccessToken(response.access_token);
       setUser(response.user);
     } catch (err) {
       const apiError = err as ApiError;
@@ -118,6 +124,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = () => {
     apiClient.clearTokens();
+    setAccessToken(null);
     setUser(null);
     setError(null);
   };
@@ -126,16 +133,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setError(null);
   };
 
+  const updateUser = (updatedUser: User) => {
+    setUser(updatedUser);
+  };
+
   const value: AuthContextType = {
     user,
     isAuthenticated: !!user,
-    accessToken: apiClient.getAccessToken(),
+    accessToken,
     isLoading,
     error,
     login,
     register,
     logout,
     clearError,
+    updateUser,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Download, X, AlertTriangle, ChevronDown, Database, FileSpreadsheet, FileJson, FileText, Table } from 'lucide-react';
+import { Download, X, AlertTriangle, Database, FileSpreadsheet, FileJson, FileText, Table, ChevronLeft, ChevronRight } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import type { MarketplaceListing, TemplateMetadata } from '../types';
 import { validateListings, validateListing } from '../utils/validation';
@@ -22,6 +22,13 @@ export function ExportButton({ data, sortField, sortDirection, template, onPrevi
   const [showPreview, setShowPreview] = useState(false);
   const [reverseOrder, setReverseOrder] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+
+  // Reset to page 1 when preview opens or data changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [showPreview, data.length]);
 
   // Notify parent when preview state changes
   useEffect(() => {
@@ -29,7 +36,7 @@ export function ExportButton({ data, sortField, sortDirection, template, onPrevi
       onPreviewRender(showPreview ? renderPreviewContent() : null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- renderPreviewContent is stable, onPreviewRender is optional callback
-  }, [showPreview, data, sortField, sortDirection, reverseOrder]);
+  }, [showPreview, data, sortField, sortDirection, reverseOrder, currentPage, itemsPerPage]);
 
   const getSortedData = () => {
     // Filter out invalid listings (missing required fields)
@@ -359,6 +366,13 @@ export function ExportButton({ data, sortField, sortDirection, template, onPrevi
     const sortedData = getSortedData();
     const validation = validateListings(sortedData);
 
+    // Calculate pagination
+    const totalItems = sortedData.length;
+    const totalPages = Math.ceil(totalItems / itemsPerPage);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
+    const paginatedData = sortedData.slice(startIndex, endIndex);
+
     return (
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 flex flex-col">
         {/* Header */}
@@ -366,7 +380,7 @@ export function ExportButton({ data, sortField, sortDirection, template, onPrevi
           <div>
             <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Export Preview</h2>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              Showing first 10 of {data.length} listings • {sortField ? `Sorted by ${sortField} (${sortDirection})` : 'Original order'}
+              Showing {startIndex + 1}-{endIndex} of {totalItems} listings • {sortField ? `Sorted by ${sortField} (${sortDirection})` : 'Original order'}
             </p>
           </div>
           <button
@@ -449,7 +463,7 @@ export function ExportButton({ data, sortField, sortDirection, template, onPrevi
               </tr>
             </thead>
             <tbody>
-              {sortedData.slice(0, 10).map((listing, idx) => {
+              {paginatedData.map((listing, idx) => {
                 const itemValidation = validateListings([listing]);
                 const hasEmptyTitle = itemValidation.emptyTitles > 0;
                 const hasEmptyDescription = itemValidation.emptyDescriptions > 0;
@@ -458,7 +472,7 @@ export function ExportButton({ data, sortField, sortDirection, template, onPrevi
                 const hasError = hasEmptyTitle || hasEmptyDescription || hasProhibited;
 
                 return (
-                  <tr key={idx} className={`hover:bg-gray-50 dark:hover:bg-gray-700 ${hasError ? 'bg-red-50 dark:bg-red-900/10' : ''}`}>
+                  <tr key={startIndex + idx} className={`hover:bg-gray-50 dark:hover:bg-gray-700 ${hasError ? 'bg-red-50 dark:bg-red-900/10' : ''}`}>
                     <td className={`border dark:border-gray-700 px-3 py-2 ${hasEmptyTitle ? 'text-red-600 dark:text-red-400 font-medium' : hasProhibited ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-gray-100'}`}>
                       {hasEmptyTitle ? '⚠️ Empty' : hasProhibited ? `🚫 ${listing.TITLE}` : listing.TITLE}
                     </td>
@@ -476,6 +490,69 @@ export function ExportButton({ data, sortField, sortDirection, template, onPrevi
               })}
             </tbody>
           </table>
+        </div>
+
+        {/* Pagination Controls */}
+        <div className="flex items-center justify-between px-6 py-3 border-t dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
+          {/* Items per page selector */}
+          <div className="flex items-center gap-3">
+            <label htmlFor="items-per-page" className="text-sm text-gray-700 dark:text-gray-300">
+              Items per page:
+            </label>
+            <select
+              id="items-per-page"
+              value={itemsPerPage}
+              onChange={(e) => {
+                setItemsPerPage(Number(e.target.value));
+                setCurrentPage(1);
+              }}
+              className="px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            >
+              <option value={10}>10</option>
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+          </div>
+
+          {/* Page navigation */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setCurrentPage(1)}
+              disabled={currentPage === 1}
+              className="px-2 py-1 text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              aria-label="First page"
+            >
+              First
+            </button>
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+              className="p-1 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              aria-label="Previous page"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <span className="text-sm text-gray-700 dark:text-gray-300 px-2">
+              Page {currentPage} of {totalPages}
+            </span>
+            <button
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={currentPage === totalPages}
+              className="p-1 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              aria-label="Next page"
+            >
+              <ChevronRight size={16} />
+            </button>
+            <button
+              onClick={() => setCurrentPage(totalPages)}
+              disabled={currentPage === totalPages}
+              className="px-2 py-1 text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              aria-label="Last page"
+            >
+              Last
+            </button>
+          </div>
         </div>
 
         {/* Footer */}
@@ -518,25 +595,15 @@ export function ExportButton({ data, sortField, sortDirection, template, onPrevi
 
   return (
     <div className="relative">
-      {/* Main Export Button */}
-      <button
-        onClick={() => setShowPreview(true)}
-        disabled={data.length === 0}
-        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-l-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors shadow-sm select-text"
-      >
-        <Download size={16} />
-        Export for FB
-      </button>
-
-      {/* Dropdown Toggle */}
+      {/* Export Icon Button with Dropdown */}
       <button
         onClick={() => setShowExportMenu(!showExportMenu)}
         disabled={data.length === 0}
-        aria-label="Export options menu"
-        aria-expanded={showExportMenu}
-        className="inline-flex items-center px-2 py-2 text-sm font-medium text-white bg-blue-600 rounded-r-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors shadow-sm border-l border-blue-500 select-text"
+        aria-label="Export - Download listings in various formats"
+        title="Export - Download listings in various formats"
+        className="p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
       >
-        <ChevronDown size={16} aria-hidden="true" />
+        <Download size={20} />
       </button>
 
       {/* Export Options Dropdown */}

@@ -1,0 +1,1002 @@
+---
+type: "always_apply"
+description: "Mandatory rules for all AI assistant interactions - workflow patterns, evidence requirements, and critical constraints"
+---
+
+# Mandatory Rules
+
+**Version**: 5.1 - Complete Rule Set (Rules 0-36)
+
+## Rule 0: Mandatory Workflow Pattern (META-RULE)
+
+**PER STEP pattern required:**
+1. State which rules apply to THIS step
+2. Execute THIS step
+3. Show evidence (full terminal output)
+4. Verify compliance
+5. **Auto-proceed to next step** (don't ask "what next?")
+
+**Forbidden:** Bulk execution, no evidence, claims without OCR, ending with questions unless blocked
+
+---
+
+## Rule 1: Workspace Authority (HARD STOP)
+
+**Before any code, test, build, or deployment discussion, declare:**
+- Repository name
+- Absolute or repo-relative root path
+- All actions apply only to that workspace
+
+**If unclear → stop and ask.**
+
+---
+
+## Rule 2: Evidence-Before-Assertion
+
+**No claims without proof:**
+- Full terminal output
+- OCR verification
+- Screenshots displayed to user (`code /tmp/screenshot.png`)
+
+**Forbidden:** "I can see", "appears to work" without evidence
+
+---
+
+## Rule 3: Execution Boundary (CRITICAL)
+
+**Never imply the assistant executed actions.**
+
+**Forbidden:** "I ran", "I deployed", "I tested", "I verified"
+
+**Allowed:** "The output shows…", "Based on the provided logs…"
+
+---
+
+## Rule 4: Stop-the-Line Conditions (HARD STOP)
+
+**Immediately stop if any occur:**
+- Conflicting tool outputs
+- Workspace ambiguity
+- Unverified deployment or test claims
+- Explicit user correction
+- Active user constraints violated
+
+**Only clarification is allowed until resolved.**
+
+---
+
+## Rule 5: Ask Don't Guess
+
+**Ask ONLY when:**
+- Destructive action requiring permission (delete, push, deploy)
+- True ambiguity with competing interpretations
+- Missing critical information
+
+**Do NOT ask:**
+- "What would you like me to do next?" (use Rule 31 - auto-proceed)
+- "Should I continue?" (just continue)
+- Multiple choice questions about obvious next steps
+
+**Format when asking IS required:**
+```
+CLARIFICATION NEEDED:
+- Situation: [what's unclear]
+- Options: [possible choices]
+- Question: [what you need to know]
+```
+
+---
+
+## Rule 6: Scope Containment
+
+**"Fix everything related" means:**
+- Fix all instances of the current defect class
+- Do not add features, refactor, or expand scope unless asked
+- If a related issue is found, ask before acting
+
+---
+
+## Rule 7: Observation Layer Integrity
+
+**All statements must be tagged as:**
+- Filesystem
+- Build-time
+- Runtime (browser/API)
+- Deployment (remote)
+
+**Cross-layer conclusions without evidence are prohibited.**
+
+---
+
+## Rule 8: Feature Preservation (CRITICAL)
+
+**If user says "do not remove features":**
+1. Enumerate existing features
+2. Make changes
+3. Verify each feature still works
+4. Provide evidence per feature
+
+**No silent removals. No assumptions.**
+
+---
+
+## Rule 9: End-to-End Workflow Proof & Selenium Testing
+
+**Loading a page ≠ proof. Test COMPLETE workflow:**
+- Setup
+- Usage
+- Data persistence
+- Integration points
+- Failure paths
+
+**See Rule 22 for complete workflow requirements.**
+
+---
+
+## Rule 10: User Constraints Override Everything
+
+**Explicit user constraints override:**
+- Defaults
+- Prior behavior
+- "Best practices"
+
+**Constraints persist until revoked.**
+
+---
+
+## Rule 11: ORM Safety (CRITICAL)
+
+**Never use reserved names:** metadata, query, session, registry
+
+**Test DB initialization immediately.**
+
+---
+
+## Rule 12: Docker Configuration (CRITICAL)
+
+**All required env vars must be passed:** DB, cache, rate limits, secrets
+
+**Verify connectivity before claiming success.**
+
+---
+
+## Rule 13: Python Version Compatibility (MAJOR)
+
+**Use stable Python (3.11 / 3.12) in Docker.**
+
+**Do not use bleeding-edge images.**
+
+---
+
+## Rule 14: Database Alignment (MAJOR)
+
+**Do not change database type without user approval.**
+
+**Preserve SQL export paths if present.**
+
+---
+
+## Rule 15: Tone After Errors
+
+**After corrections or failures:**
+- Neutral
+- Technical
+- Factual
+- No celebratory language
+
+---
+
+## Rule 16: Workflow Context Preservation
+
+**Understand and preserve complete user workflows.**
+
+**User workflow for this app:**
+1. OCR Scanning → Product catalogs
+2. Python Scripts → Parse OCR results
+3. Manual Editing → Create `_edited.xlsx` versions
+4. Web UI → Load into Marketplace Bulk Editor
+5. Export → Download Facebook-compatible files
+6. Upload → Submit to Facebook Marketplace
+
+**Never assume a tool is used in isolation.**
+
+---
+
+## Rule 17: Data Format Compatibility
+
+**Maintain compatibility with external formats (Facebook Marketplace, APIs).**
+
+**Facebook Marketplace format:**
+- TITLE (max 150 characters)
+- PRICE (number > 0)
+- CONDITION (enum: New, Used - Like New, Used - Good, Used - Fair)
+- DESCRIPTION (text)
+- CATEGORY (text)
+- OFFER SHIPPING (Yes/No)
+
+**Never rename columns or change data types without verification.**
+
+---
+
+## Rule 18: Feature Removal Prohibition (CRITICAL)
+
+**Never remove features without explicit permission.**
+
+**App features (15+):**
+- Dark mode
+- Keyboard navigation
+- Undo/redo
+- Bulk actions
+- Column visibility
+- Export preview
+- Search/filter
+- Autocomplete
+- Character counter
+- Sticky header
+- Auto-save indicator
+- Duplicate button
+- Import validation
+
+**Every feature exists for a reason. Always ask before removing ANY feature.**
+
+---
+
+## Rule 19: OCR Data Handling
+
+**Handle OCR artifacts and noise without auto-deleting data.**
+
+**OCR data contains:**
+- Spurious single characters ("A", "7")
+- Formatting artifacts (extra spaces, tabs)
+- Misread characters (0/O, 1/l/I confusion)
+- Incomplete or truncated text
+
+**Provide cleanup tools, let users decide. Show warnings without rejecting data.**
+
+---
+
+## Rule 20: UI State Preservation
+
+**Persist user preferences across sessions.**
+
+**Preferences to persist (localStorage):**
+- Dark mode preference
+- Column visibility settings
+- Column widths
+- Sort preferences
+- Search filters
+
+**Handle missing/corrupted data gracefully. Provide reset to defaults option.**
+
+---
+
+## Rule 21: Task Completion Evidence Requirements
+
+**When task is complete, provide comprehensive evidence:**
+1. Executive summary of what was requested
+2. What was actually done
+3. Terminal output for ALL claims
+4. Map each requirement to specific evidence
+5. Test all services and show results
+
+**User requirement:** "then with evidence, when done, explain what I asked and what was done and show with evidence how it complies with the request"
+
+---
+
+## Rule 22: Complete Workflow Testing (CRITICAL)
+
+**Test COMPLETE workflow, not just initial page load.**
+
+**For backend/database features (minimum 13+ screenshots):**
+1. Setup: `./docker-start.sh` + container status
+2. User registration: API call + JWT tokens
+3. Login: API call + response
+4. Create listing: API call + database verification
+5. Templates: Creation + usage
+6. OCR: File upload + processing + results
+7. Export: Export + file content verification
+8. Rate limiting: 429 error after exceeding limits
+9. Database: `psql` queries proving persistence
+10. Redis: `redis-cli` commands proving caching
+11. Cleanup: `./docker-stop.sh` + data preservation
+
+**For UI features (minimum 10+ screenshots):**
+1. Initial load
+2. Backend status (collapsed + expanded)
+3. File upload area
+4. Data table with data
+5. Cell editing (before/after)
+6. Export preview modal
+7. Dark mode toggle
+8. Search/filter
+9. Bulk actions
+10. Undo/redo
+
+---
+
+## Rule 23: Use Existing Browser Windows [DEPRECATED - See Rule 26]
+
+**When user says "the page is open in firefox":**
+- Do NOT create new browser instance
+- Do NOT write new test script
+- Use xdotool to interact with EXISTING window
+- Assume user has already done setup
+
+**See Rule 26 for complete workflow.**
+
+---
+
+## Rule 24: Test Before Push (HARD STOP)
+
+**NEVER push broken code.**
+
+**Before ANY git push:**
+1. ✅ Run dev server (`npm run dev`)
+2. ✅ Run Selenium test in VISIBLE mode
+3. ✅ Verify 0 critical errors in console logs
+4. ✅ Verify OCR finds expected text
+5. ✅ Show terminal output proving app works
+
+**If ANY item fails, FIX THE CODE before pushing.**
+
+---
+
+## Rule 25: Display Debug in UI, Not Console (CRITICAL)
+
+**When user says "save it yourself in the debug area at the bottom of the page":**
+
+**Add debug state to Context:**
+```typescript
+const [debugLogs, setDebugLogs] = useState<DebugLog[]>([]);
+const addDebugLog = (level, message, data) => {
+  setDebugLogs(prev => [...prev, {
+    timestamp: new Date().toISOString(),
+    level,
+    message,
+    data
+  }]);
+  console.log(`${emoji} [${message}]`, data);
+};
+```
+
+**Display in UI:**
+```typescript
+{debugLogs.map((log, idx) => (
+  <div key={idx} className={getColorClass(log.level)}>
+    [{new Date(log.timestamp).toLocaleTimeString()}]
+    {getEmoji(log.level)} {log.message}
+    {log.data && <pre>{JSON.stringify(log.data, null, 2)}</pre>}
+  </div>
+))}
+```
+
+**Why:** User shouldn't have to open browser console. Manual copy/paste increases chance of error.
+
+---
+
+## Rule 26: Use Existing Browser Window
+
+**When user says "page is open in firefox":**
+
+**WORKING COMMAND to list ALL Firefox windows with FULL titles (use this EXACT command):**
+```bash
+DISPLAY=:0 xdotool search --class "firefox" 2>/dev/null | while read wid; do
+  title=$(DISPLAY=:0 xprop -id $wid _NET_WM_NAME 2>/dev/null | cut -d'"' -f2)
+  echo "$wid: $title"
+done
+```
+
+**Why this command works:**
+- `xdotool getwindowname` returns truncated titles (just "Firefox")
+- `xprop -id $wid _NET_WM_NAME` returns FULL window title (e.g., "marketplace-bulk-editor — Mozilla Firefox Private Browsing")
+- This is the ONLY way to reliably identify which Firefox window has the app
+
+**Example output:**
+```
+60817409: Firefox
+61082223: VSCode Terminal Cursor Issues — Mozilla Firefox
+61083791: marketplace-bulk-editor — Mozilla Firefox Private Browsing
+```
+
+**Workflow:**
+1. List ALL Firefox windows using command above
+2. Find correct window by title (contains "marketplace" or "localhost:5174" or "localhost:5173")
+3. Extract the window ID from the line with matching title
+4. Activate THAT window by ID: `DISPLAY=:0 xdotool windowactivate --sync <WINDOW_ID> && DISPLAY=:0 xdotool windowraise <WINDOW_ID>`
+5. Wait: `sleep 2`
+6. Take screenshot: `DISPLAY=:0 import -window root /tmp/screenshot.png`
+7. Run OCR: `tesseract /tmp/screenshot.png /tmp/ocr_output && cat /tmp/ocr_output.txt`
+8. Display screenshot: `code /tmp/screenshot.png`
+9. Verify with OCR that Firefox is visible (not VSCode)
+
+**Alternative: Find window ID directly with grep:**
+```bash
+DISPLAY=:0 xdotool search --class "firefox" 2>/dev/null | while read wid; do
+  title=$(DISPLAY=:0 xprop -id $wid _NET_WM_NAME 2>/dev/null | cut -d'"' -f2)
+  if echo "$title" | grep -qi "marketplace"; then
+    echo "$wid: $title"
+  fi
+done
+```
+
+**Why `--class "firefox"` not `--name "Firefox"`:**
+- `--class` searches window CLASS (reliable, always "firefox")
+- `--name` searches window TITLE (unreliable, changes based on page)
+
+**Forbidden:**
+- Using `xdotool getwindowname` (returns truncated titles)
+- Creating new Selenium instances
+- Activating wrong window
+- Using `--name` instead of `--class`
+
+---
+
+## Rule 27: Screenshot Claims Require OCR
+
+**NEVER say "I can see" without:**
+1. Running OCR with PIL preprocessing (see below)
+2. Showing FULL OCR output
+3. Displaying screenshot to user
+4. Basing claims ONLY on OCR text
+
+**Required OCR Method (PIL + 2x scaling):**
+```python
+from PIL import Image, ImageEnhance, ImageFilter
+import pytesseract
+
+img = Image.open('/tmp/screenshot.png')
+
+# 1. Scale up 2x FIRST (critical for accuracy)
+width, height = img.size
+img = img.resize((width * 2, height * 2), Image.LANCZOS)
+
+# 2. Convert to grayscale
+img = img.convert('L')
+
+# 3. Sharpen
+enhancer = ImageEnhance.Sharpness(img)
+img = enhancer.enhance(2.0)
+
+# 4. Enhance contrast
+enhancer = ImageEnhance.Contrast(img)
+img = enhancer.enhance(2.0)
+
+# 5. Reduce noise
+img = img.filter(ImageFilter.MedianFilter(size=3))
+
+# 6. Sharpen again
+enhancer = ImageEnhance.Sharpness(img)
+img = enhancer.enhance(3.0)
+
+# 7. Run OCR with config
+text = pytesseract.image_to_string(img, config='--oem 3 --psm 3')
+print(text)
+```
+
+**Why 2x scaling matters:** Without scaling, OCR truncates text (e.g., "Jump to Debug L" instead of "Jump to Debug Logs")
+
+**Forbidden phrases without OCR:**
+- "I can see..."
+- "The screenshot shows..."
+- "The fix appears to be working..."
+
+---
+
+## Rule 28: Application Parameters Database
+
+**BEFORE any action involving ports/URLs/credentials:**
+
+1. Read `.augment/APP_PARAMETERS_DATABASE.md`
+2. Quote relevant section
+3. Use ONLY documented parameters
+
+**Trigger phrases:**
+- `@APP_PARAMETERS_DATABASE.md`
+- "Use deterministic parameters"
+
+**Forbidden:** Guessing port numbers, assuming credentials
+
+---
+
+## Rule 29: Terminal Output Capture & Session Management (CRITICAL)
+
+**Problem:** After 50+ terminal sessions, `launch-process` experiences resource exhaustion:
+- Output capture fails (empty output from valid commands)
+- Commands execute but return no text
+- Buffer allocation issues
+
+**Solution 1: ALWAYS use heredoc format for reliable output capture:**
+
+```bash
+# ✅ CORRECT - Heredoc format (works even at high session counts)
+bash << 'BASH_EOF'
+echo "line 1"
+echo "line 2"
+python3 script.py
+BASH_EOF
+
+# For Node.js:
+node << 'NODEJS_EOF'
+const XLSX = require('xlsx');
+console.log("output");
+NODEJS_EOF
+
+# ❌ WRONG - Inline commands (fail after 50+ sessions)
+echo "test"
+python3 -c "print('test')"
+cmd1 && cmd2
+```
+
+**Solution 2: Monitor session count:**
+
+```bash
+# Check current session count with list-processes tool
+# If count > 40: Warn user that session restart may be needed soon
+# If count > 50: Recommend starting new conversation
+```
+
+**Why heredoc works:**
+- Creates explicit subshell with proper stdout capture
+- Avoids terminal buffer allocation issues
+- Works regardless of session count
+
+**Session management guidance:**
+| Sessions | Status | Action |
+|----------|--------|--------|
+| 0-30 | ✅ Normal | Continue normally |
+| 30-50 | ⚠️ Warning | Use heredoc, monitor for issues |
+| 50+ | 🔴 Critical | Recommend new conversation if output fails |
+
+**Required pattern for ALL commands:**
+```bash
+bash << 'SCRIPT_EOF'
+# Your commands here
+command1
+command2
+SCRIPT_EOF
+```
+
+---
+
+## Rule 30: Project Dependencies (xlsx, d3, etc.)
+
+**This project already has these dependencies installed:**
+
+```json
+// package.json dependencies (already installed)
+{
+  "xlsx": "^0.18.5",        // Excel file reading/writing
+  "tesseract.js": "^5.1.1", // Browser-based OCR
+  "lucide-react": "^0.468.0" // Icons
+}
+```
+
+**Use xlsx (NOT pandas) for reading Excel files:**
+
+```javascript
+// ✅ CORRECT - Use project's xlsx dependency
+const XLSX = require('xlsx');
+const wb = XLSX.readFile('/path/to/file.xlsx');
+const ws = wb.Sheets[wb.SheetNames[0]];
+const data = XLSX.utils.sheet_to_json(ws);
+
+// ❌ WRONG - pandas is NOT installed in this environment
+import pandas as pd  // ModuleNotFoundError
+```
+
+**Available in Node.js environment:**
+- xlsx - Excel reading/writing
+- All npm packages in node_modules/
+
+**NOT available:**
+- pandas (Python, not installed)
+- openpyxl (Python, not installed)
+
+---
+
+---
+
+## Rule 31: Proceed With Obvious Next Steps
+
+**Evidence:** User said "reword requests" 2+ times in session (2025-12-26)
+
+**When the next step is OBVIOUS, proceed without asking:**
+- Testing after fixing a bug
+- Running lint after code changes
+- Building after edits
+- Showing evidence after executing commands
+- Continuing to next item in a multi-step plan
+
+**ALWAYS ask before:**
+- Destructive actions (delete files, remove features, push, deploy, install dependencies)
+- Scope expansion (adding unrequested features, refactoring unrelated code)
+- True ambiguity (multiple valid interpretations of user request)
+- Missing critical information (which file? which approach?)
+
+**Do NOT end responses with vague questions:**
+- ❌ "What would you like me to do next?" (if next step is obvious)
+- ❌ "Should I proceed with testing?" (just test it)
+- ✅ "Should I delete the old implementation?" (destructive - ask first)
+- ✅ "Which approach: A or B?" (genuine ambiguity - ask first)
+
+---
+
+## Rule 32: Prefer Project Scripts Over Generic Commands
+
+**Evidence:** User corrected: "do not @rules show that ./start.sh should be running" after port conflicts
+
+**BEFORE using generic commands:**
+```bash
+# 1. Check for project scripts
+ls *.sh
+
+# 2. If start.sh/stop.sh exist, use them
+./start.sh  # NOT npm run dev
+./stop.sh   # NOT pkill node
+```
+
+**Why:** Project scripts handle port cleanup, PID tracking, stray processes
+
+---
+
+## Rule 33: Concise Response Format
+
+**Evidence:** Verbose explanations wasted user time scanning for results (2025-12-26)
+
+**Required format:**
+```
+### Step N: [action]
+**Rules:** [numbers, e.g., 2, 26, 27]
+**Command:** [code block]
+**Evidence:** [1-2 line summary + raw output]
+**Status:** ✅ or ❌
+```
+
+**Forbidden:**
+- Long explanations before actions
+- Repeating what was just done
+- "I will now..." preambles
+
+---
+
+## Rule 34: Debugging Build/Syntax Errors - Use Tools First (CRITICAL)
+
+**When encountering build errors, syntax errors, or compilation failures, the assistant MUST:**
+
+**Phase 1: Run Linting Tools (FIRST)**
+```bash
+npm run lint 2>&1 | tee lint_output.txt
+npx tsc --noEmit 2>&1 | tee tsc_output.txt
+```
+
+**Phase 2: Clear Build Cache (SECOND)**
+```bash
+./stop.sh
+rm -rf node_modules/.vite .vite dist
+./start.sh
+tail -50 .vite.log
+```
+
+**Phase 3: Verify Fix (THIRD)**
+```bash
+tail -30 .vite.log | grep -i "error\|fail"
+```
+
+**Phase 4: Manual Code Examination (ONLY IF TOOLS SHOW NO ERRORS)**
+- If ESLint shows no errors
+- AND TypeScript shows no errors
+- AND cache clear doesn't fix it
+- THEN examine code manually
+
+**Forbidden:**
+- ❌ Manually examining code before running linting tools
+- ❌ Counting braces manually before checking TypeScript compiler
+- ❌ Assuming syntax error without verifying with ESLint/TypeScript
+- ❌ Ignoring cache as potential cause
+
+**Why:** Linting tools are faster/more accurate than manual review. Cache corruption can cause false errors (Babel vs ESLint/TypeScript mismatch).
+
+**Evidence:** User asked "why not lint?" after assistant wasted time manually examining code (2025-12-29)
+
+---
+
+## Other Critical Rules
+
+**Rule 4: Scope Containment** - Fix only what's requested, don't expand scope
+
+**Rule 18: Feature Removal Prohibition** - Never remove features without permission
+
+**Rule 24: Test Before Push** - Never push broken code
+
+**Rule 25: Display Debug in UI** - Add debug logs to UI, not just console
+
+---
+
+## Rule 35: Browser Priority for Selenium Tests (CRITICAL)
+
+**When running Selenium tests, ALWAYS follow this priority:**
+
+### Priority Order:
+1. **Firefox** (first choice)
+   - Check if marketplace-bulk-editor is already open in Firefox
+   - If yes: Use existing window (Rule 26)
+   - If no: Try to create new Firefox instance
+2. **Chromium** (second choice)
+   - If Firefox not available, try Chromium
+3. **Chrome** (third choice)
+   - If Chromium not available, use Chrome
+
+### Implementation Pattern:
+
+```python
+def setup_driver():
+    """Setup WebDriver with browser priority: Firefox → Chromium → Chrome"""
+
+    # Step 1: Check for existing Firefox window with marketplace-bulk-editor
+    existing_firefox = check_existing_firefox_window()
+    if existing_firefox:
+        print("✅ Found existing Firefox window with marketplace-bulk-editor")
+        print(f"Window ID: {existing_firefox['wid']}")
+        print(f"Title: {existing_firefox['title']}")
+        # Use xdotool to control existing window
+        return use_existing_firefox(existing_firefox['wid'])
+
+    # Step 2: Try Firefox (new instance)
+    try:
+        from selenium.webdriver.firefox.options import Options as FirefoxOptions
+        firefox_options = FirefoxOptions()
+        firefox_options.set_capability('moz:firefoxOptions', {'log': {'level': 'trace'}})
+        driver = webdriver.Firefox(options=firefox_options)
+        print("✅ Using Firefox (new instance)")
+        return driver
+    except Exception as e:
+        print(f"⚠️  Firefox not available: {e}")
+
+    # Step 3: Try Chromium
+    try:
+        from selenium.webdriver.chrome.options import Options as ChromeOptions
+        chromium_options = ChromeOptions()
+        chromium_options.binary_location = "/usr/bin/chromium"  # or /usr/bin/chromium-browser
+        chromium_options.set_capability('goog:loggingPrefs', {'browser': 'ALL'})
+        driver = webdriver.Chrome(options=chromium_options)
+        print("✅ Using Chromium")
+        return driver
+    except Exception as e:
+        print(f"⚠️  Chromium not available: {e}")
+
+    # Step 4: Try Chrome (last resort)
+    try:
+        from selenium.webdriver.chrome.options import Options as ChromeOptions
+        chrome_options = ChromeOptions()
+        chrome_options.set_capability('goog:loggingPrefs', {'browser': 'ALL'})
+        driver = webdriver.Chrome(options=chrome_options)
+        print("✅ Using Chrome")
+        return driver
+    except Exception as e:
+        print(f"❌ Chrome not available: {e}")
+        raise Exception("No browser available (tried Firefox, Chromium, Chrome)")
+
+def check_existing_firefox_window():
+    """Check if marketplace-bulk-editor is open in Firefox"""
+    import subprocess
+
+    try:
+        # Use Rule 26 command to find Firefox windows
+        cmd = """
+        DISPLAY=:0 xdotool search --class "firefox" 2>/dev/null | while read wid; do
+          title=$(DISPLAY=:0 xprop -id $wid _NET_WM_NAME 2>/dev/null | cut -d'"' -f2)
+          if echo "$title" | grep -qi "marketplace"; then
+            echo "$wid|$title"
+          fi
+        done
+        """
+        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+
+        if result.stdout.strip():
+            # Found existing window
+            wid, title = result.stdout.strip().split('|', 1)
+            return {'wid': wid, 'title': title}
+
+        return None
+    except Exception as e:
+        print(f"⚠️  Could not check for existing Firefox window: {e}")
+        return None
+```
+
+### Why This Priority?
+
+1. **Firefox first**:
+   - User may already have marketplace-bulk-editor open
+   - Reusing existing window is faster and preserves state
+   - Firefox DevTools are excellent for debugging
+
+2. **Chromium second**:
+   - Open-source alternative to Chrome
+   - Same engine as Chrome but without Google tracking
+   - Often pre-installed on Linux systems
+
+3. **Chrome last**:
+   - Proprietary browser
+   - Use only if Firefox and Chromium unavailable
+   - Still better than failing the test
+
+### Forbidden:
+
+- ❌ Using Chrome without trying Firefox first
+- ❌ Creating new browser instance when existing Firefox window is available
+- ❌ Not showing which browser was selected
+- ❌ Not explaining why fallback occurred
+
+### Evidence Required:
+
+**ALWAYS show:**
+```
+Checking for existing Firefox window with marketplace-bulk-editor...
+Found window: 61083791: marketplace-bulk-editor — Mozilla Firefox Private Browsing
+✅ Using existing Firefox window
+
+OR
+
+Checking for existing Firefox window with marketplace-bulk-editor...
+No existing window found
+Trying Firefox (new instance)...
+✅ Using Firefox (new instance)
+
+OR
+
+Checking for existing Firefox window with marketplace-bulk-editor...
+No existing window found
+Trying Firefox (new instance)...
+⚠️  Firefox not available: geckodriver not found
+Trying Chromium...
+✅ Using Chromium
+```
+
+---
+
+## Enforcement
+
+**If assistant violates any rule:**
+1. User MUST stop immediately
+2. Cite rule number
+3. Require restart with proper pattern
+
+---
+
+## Rule 36: Full Error Console Messages Required (CRITICAL)
+
+**When ANY error occurs (browser, terminal, build), the assistant MUST show:**
+
+### Browser Console Errors
+
+**ALWAYS capture and display FULL console output:**
+
+```bash
+# Method 1: Use browser DevTools Protocol (Selenium)
+from selenium.webdriver.chrome.options import Options
+
+options = Options()
+options.set_capability('goog:loggingPrefs', {'browser': 'ALL'})
+driver = webdriver.Chrome(options=options)
+
+# After action that might cause error
+logs = driver.get_log('browser')
+for entry in logs:
+    print(f"[{entry['level']}] {entry['source']}")
+    print(f"  {entry['message']}")
+    print(f"  Timestamp: {entry['timestamp']}")
+```
+
+**Required information:**
+1. ✅ Full error message (not "An error occurred")
+2. ✅ Complete stack trace with file paths
+3. ✅ Line and column numbers
+4. ✅ Error type (TypeError, ReferenceError, etc.)
+5. ✅ All console.error() output
+6. ✅ All console.warn() output (if relevant)
+7. ✅ Network errors (if relevant)
+
+### Terminal/Build Errors
+
+**ALWAYS show FULL terminal output:**
+
+```bash
+# WRONG - Hiding error details
+npm run build 2>&1 | tail -5
+
+# CORRECT - Show full error
+npm run build 2>&1
+```
+
+**Required information:**
+1. ✅ Full error message
+2. ✅ Complete stack trace
+3. ✅ File paths and line numbers
+4. ✅ Error codes
+5. ✅ All preceding context (what led to error)
+
+### Forbidden Patterns
+
+**❌ NEVER say:**
+- "An error occurred" (without showing the error)
+- "The build failed" (without showing why)
+- "There's a console error" (without showing what it says)
+- "I see an error in the logs" (without pasting the error)
+- "The test failed with an error" (without showing the error message)
+
+**❌ NEVER truncate errors:**
+- "Error: Cannot read property... [truncated]"
+- "Stack trace: ... (50 more lines)"
+- "See console for details" (paste the console output!)
+
+### Required Pattern
+
+**When reporting ANY error:**
+
+```
+### Error Detected
+
+**Error Type:** [TypeError/ReferenceError/etc.]
+
+**Full Error Message:**
+```
+[paste COMPLETE error message - no truncation]
+```
+
+**Stack Trace:**
+```
+[paste COMPLETE stack trace with file paths and line numbers]
+```
+
+**Context:**
+- Action that triggered error: [what was being done]
+- File: [full path]
+- Line: [line number]
+- Column: [column number]
+
+**Console Output:**
+```
+[paste ALL console.error and console.warn output]
+```
+```
+
+### Why This Rule Exists
+
+**User complaint that triggered this rule:**
+> "settings icon fails - Something Went Wrong"
+
+**What was missing:**
+- ❌ No browser console error shown
+- ❌ No stack trace provided
+- ❌ No error details from ErrorBoundary
+- ❌ User had to ask "what's the actual error?"
+
+**What should have been shown immediately:**
+```
+Error: Cannot access 'loadBackupInfo' before initialization
+    at BackupManager.tsx:29:5
+    at useState (react-dom.development.js:1234)
+    at BackupManager (BackupManager.tsx:16)
+    at SettingsModal (SettingsModal.tsx:273)
+```
+
+**With this information, root cause is obvious:** Temporal dead zone error in BackupManager.
+
+**Without this information:** User wastes time asking for details.
+
+### Compliance Verification
+
+**Before claiming "error fixed":**
+1. ✅ Show FULL error message that was occurring
+2. ✅ Show FULL stack trace
+3. ✅ Show what was changed to fix it
+4. ✅ Show FULL console output after fix (proving 0 errors)
+
+**If assistant violates this rule:**
+- User MUST stop and cite Rule 36
+- Require full error details before proceeding
+
+---
+
+**Full rules**: See `RULES_AUDIT_2025-12-26.json` for evidence-backed audit
+

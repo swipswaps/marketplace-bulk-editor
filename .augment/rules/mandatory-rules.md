@@ -1,346 +1,472 @@
 ---
 type: "always_apply"
-description: "Mandatory rules for all AI assistant interactions - workflow patterns, evidence requirements, and critical constraints"
+description: "Mandatory rules for all AI assistant interactions - workflow patterns, evidence requirements, evidence persistence, and critical constraints"
 ---
 
-# Mandatory Rules (Condensed)
+# Mandatory Rules for AI Assistant Interactions
 
-**Version**: 4.0
+Version: 6.0 (Enforced - Request Compliance Upgrade)
+Status: Authoritative
+Scope: Overrides all default assistant behavior
 
-## Rule 0: Mandatory Workflow Pattern (META-RULE)
+CHANGELOG v6.0 (2026-01-02):
+- Rule 0: Enhanced with BEFORE/AFTER state capture requirement
+- Rule 2: Upgraded to CRITICAL with evidence persistence requirements
+- Rule 39: NEW - Evidence Persistence (all evidence saved to files)
+- Rule 40: NEW - No Excuses, Find a Way (solution-oriented responses)
 
-**PER STEP pattern required:**
+============================================================
+RULE CLASSES (READ FIRST)
+============================================================
+
+🔴 HARD STOP — Immediate halt required if violated  
+🟠 CRITICAL — High-risk; strict evidence required  
+🟡 MAJOR — Strong constraint; deviation requires justification  
+🔵 FORMAT — Output structure enforcement  
+
+============================================================
+🔒 RULE ACTIVATION GATE (NON-NEGOTIABLE)
+============================================================
+
+The assistant MUST NOT perform any task, reasoning, planning, or suggestion until ALL items below are completed verbatim:
+
+1. Restate Rule 0 in one sentence.
+2. List ALL rules that apply to the FIRST step.
+3. Explicitly state: “I will not proceed until this gate is satisfied.”
+4. If workspace info is missing, STOP and ask under Rule 1.
+
+Failure to complete this gate = HARD VIOLATION.
+
+============================================================
+RULE 0 — Mandatory Workflow Pattern (META-RULE) 🔴
+============================================================
+
+For EVERY step:
+
 1. State which rules apply to THIS step
-2. Execute THIS step
-3. Show evidence (full terminal output)
-4. Verify compliance
+2. IF step involves changes/fixes:
+   a. Capture BEFORE state (save to /tmp/before_*.txt)
+   b. Execute ONLY this step
+   c. Capture AFTER state (save to /tmp/after_*.txt)
+   d. Show before/after comparison
+3. IF step is read-only:
+   a. Execute step
+   b. Save output to /tmp/[step_name].txt
+4. Show full evidence (terminal output / OCR / logs) + file paths
+5. Verify compliance explicitly
+6. Auto-proceed if and only if Rule 31 conditions are satisfied
 
-**Forbidden:** Bulk execution, no evidence, claims without OCR
+Forbidden:
+- Bulk execution
+- Claims without evidence
+- Making changes without capturing BEFORE state
+- Ending with “what next?” when next step is obvious
 
----
+============================================================
+RULE 1 — Workspace Authority 🔴
+============================================================
 
-## Rule 2: Evidence-Before-Assertion
+Before ANY code, test, or build discussion, declare:
 
-**No claims without proof:**
-- Full terminal output
-- OCR verification
-- Screenshots displayed to user (`code /tmp/screenshot.png`)
+- Repository name
+- Absolute or repo-relative root path
+- Scope of actions limited strictly to this workspace
 
-**Forbidden:** "I can see", "appears to work" without evidence
+If unclear → STOP and ask.
 
----
+============================================================
+RULE 2 — Evidence-Before-Assertion 🟠
+============================================================
 
-## Rule 5: Ask Don't Guess
+No factual or success claim without proof.
 
-**If ambiguous → STOP and ask**
+Allowed evidence:
+- Full terminal output (untruncated)
+- OCR-verified screenshots
+- Logs pasted verbatim
 
-Format:
-```
+Forbidden:
+- “Appears to work”
+- “I can see”
+- “This should fix it”
+
+============================================================
+RULE 3 — Execution Boundary 🟠
+============================================================
+
+The assistant MUST NEVER imply it executed actions.
+
+Forbidden:
+- “I ran”
+- “I tested”
+- “I verified”
+
+Allowed:
+- “The provided output shows…”
+- “Based on the logs above…”
+
+============================================================
+RULE 4 — Stop-the-Line Conditions 🔴
+============================================================
+
+Immediately STOP if any occur:
+- Conflicting outputs
+- Workspace ambiguity
+- Unverified execution claims
+- User correction
+- Constraint violation
+
+Only clarification is allowed until resolved.
+
+============================================================
+RULE 5 — Ask Don’t Guess 🟠
+============================================================
+
+Ask ONLY when:
+- Destructive action
+- True ambiguity
+- Missing critical info
+
+Required format:
+
 CLARIFICATION NEEDED:
-- Situation: [what's unclear]
-- Options: [possible choices]
-- Question: [what you need to know]
-```
-
----
-
-## Rule 26: Use Existing Browser Window
-
-**When user says "page is open in firefox":**
-
-**WORKING COMMAND to list ALL Firefox windows with FULL titles (use this EXACT command):**
-```bash
-DISPLAY=:0 xdotool search --class "firefox" 2>/dev/null | while read wid; do
-  title=$(DISPLAY=:0 xprop -id $wid _NET_WM_NAME 2>/dev/null | cut -d'"' -f2)
-  echo "$wid: $title"
-done
-```
-
-**Why this command works:**
-- `xdotool getwindowname` returns truncated titles (just "Firefox")
-- `xprop -id $wid _NET_WM_NAME` returns FULL window title (e.g., "marketplace-bulk-editor — Mozilla Firefox Private Browsing")
-- This is the ONLY way to reliably identify which Firefox window has the app
-
-**Example output:**
-```
-60817409: Firefox
-61082223: VSCode Terminal Cursor Issues — Mozilla Firefox
-61083791: marketplace-bulk-editor — Mozilla Firefox Private Browsing
-```
-
-**Workflow:**
-1. List ALL Firefox windows using command above
-2. Find correct window by title (contains "marketplace" or "localhost:5174" or "localhost:5173")
-3. Extract the window ID from the line with matching title
-4. Activate THAT window by ID: `DISPLAY=:0 xdotool windowactivate --sync <WINDOW_ID> && DISPLAY=:0 xdotool windowraise <WINDOW_ID>`
-5. Wait: `sleep 2`
-6. Take screenshot: `DISPLAY=:0 import -window root /tmp/screenshot.png`
-7. Run OCR: `tesseract /tmp/screenshot.png /tmp/ocr_output && cat /tmp/ocr_output.txt`
-8. Display screenshot: `code /tmp/screenshot.png`
-9. Verify with OCR that Firefox is visible (not VSCode)
-
-**Alternative: Find window ID directly with grep:**
-```bash
-DISPLAY=:0 xdotool search --class "firefox" 2>/dev/null | while read wid; do
-  title=$(DISPLAY=:0 xprop -id $wid _NET_WM_NAME 2>/dev/null | cut -d'"' -f2)
-  if echo "$title" | grep -qi "marketplace"; then
-    echo "$wid: $title"
-  fi
-done
-```
-
-**Why `--class "firefox"` not `--name "Firefox"`:**
-- `--class` searches window CLASS (reliable, always "firefox")
-- `--name` searches window TITLE (unreliable, changes based on page)
-
-**Forbidden:**
-- Using `xdotool getwindowname` (returns truncated titles)
-- Creating new Selenium instances
-- Activating wrong window
-- Using `--name` instead of `--class`
-
----
-
-## Rule 27: Screenshot Claims Require OCR
-
-**NEVER say "I can see" without:**
-1. Running OCR with PIL preprocessing (see below)
-2. Showing FULL OCR output
-3. Displaying screenshot to user
-4. Basing claims ONLY on OCR text
-
-**Required OCR Method (PIL + 2x scaling):**
-```python
-from PIL import Image, ImageEnhance, ImageFilter
-import pytesseract
-
-img = Image.open('/tmp/screenshot.png')
-
-# 1. Scale up 2x FIRST (critical for accuracy)
-width, height = img.size
-img = img.resize((width * 2, height * 2), Image.LANCZOS)
-
-# 2. Convert to grayscale
-img = img.convert('L')
-
-# 3. Sharpen
-enhancer = ImageEnhance.Sharpness(img)
-img = enhancer.enhance(2.0)
-
-# 4. Enhance contrast
-enhancer = ImageEnhance.Contrast(img)
-img = enhancer.enhance(2.0)
-
-# 5. Reduce noise
-img = img.filter(ImageFilter.MedianFilter(size=3))
-
-# 6. Sharpen again
-enhancer = ImageEnhance.Sharpness(img)
-img = enhancer.enhance(3.0)
-
-# 7. Run OCR with config
-text = pytesseract.image_to_string(img, config='--oem 3 --psm 3')
-print(text)
-```
-
-**Why 2x scaling matters:** Without scaling, OCR truncates text (e.g., "Jump to Debug L" instead of "Jump to Debug Logs")
+- Situation:
+- Options:
+- Question:
 
-**Forbidden phrases without OCR:**
-- "I can see..."
-- "The screenshot shows..."
-- "The fix appears to be working..."
-
----
-
-## Rule 28: Application Parameters Database
-
-**BEFORE any action involving ports/URLs/credentials:**
-
-1. Read `.augment/APP_PARAMETERS_DATABASE.md`
-2. Quote relevant section
-3. Use ONLY documented parameters
-
-**Trigger phrases:**
-- `@APP_PARAMETERS_DATABASE.md`
-- "Use deterministic parameters"
-
-**Forbidden:** Guessing port numbers, assuming credentials
+============================================================
+RULE 6 — Scope Containment 🟡
+============================================================
 
----
+Fix only the defect class requested.
+No feature additions or refactors without approval.
 
-## Rule 29: Terminal Output Capture & Session Management (CRITICAL)
+============================================================
+RULE 7 — Observation Layer Integrity 🟠
+============================================================
 
-**Problem:** After 50+ terminal sessions, `launch-process` experiences resource exhaustion:
-- Output capture fails (empty output from valid commands)
-- Commands execute but return no text
-- Buffer allocation issues
+All statements MUST be tagged as:
+- Filesystem
+- Build-time
+- Runtime
+- Deployment
 
-**Solution 1: ALWAYS use heredoc format for reliable output capture:**
+No cross-layer inference without evidence.
 
-```bash
-# ✅ CORRECT - Heredoc format (works even at high session counts)
-bash << 'BASH_EOF'
-echo "line 1"
-echo "line 2"
-python3 script.py
-BASH_EOF
+============================================================
+RULE 8 — Feature Preservation 🟠
+============================================================
 
-# For Node.js:
-node << 'NODEJS_EOF'
-const XLSX = require('xlsx');
-console.log("output");
-NODEJS_EOF
+If user says “do not remove features”:
 
-# ❌ WRONG - Inline commands (fail after 50+ sessions)
-echo "test"
-python3 -c "print('test')"
-cmd1 && cmd2
-```
+1. Enumerate all existing features
+2. Modify
+3. Verify each feature
+4. Provide evidence per feature
 
-**Solution 2: Monitor session count:**
+============================================================
+RULE 9 — End-to-End Workflow Proof 🟠
+============================================================
 
-```bash
-# Check current session count with list-processes tool
-# If count > 40: Warn user that session restart may be needed soon
-# If count > 50: Recommend starting new conversation
-```
+Page load ≠ success.
 
-**Why heredoc works:**
-- Creates explicit subshell with proper stdout capture
-- Avoids terminal buffer allocation issues
-- Works regardless of session count
+Full workflow must be tested:
+- Setup
+- Usage
+- Persistence
+- Integration
+- Failure paths
 
-**Session management guidance:**
-| Sessions | Status | Action |
-|----------|--------|--------|
-| 0-30 | ✅ Normal | Continue normally |
-| 30-50 | ⚠️ Warning | Use heredoc, monitor for issues |
-| 50+ | 🔴 Critical | Recommend new conversation if output fails |
+============================================================
+RULE 10 — User Constraints Override Everything 🔴
+============================================================
 
-**Required pattern for ALL commands:**
-```bash
-bash << 'SCRIPT_EOF'
-# Your commands here
-command1
-command2
-SCRIPT_EOF
-```
+Explicit constraints override all defaults and best practices.
+Constraints persist until revoked.
 
----
+============================================================
+RULE 11 — ORM Safety 🟠
+============================================================
 
-## Rule 30: Project Dependencies (xlsx, d3, etc.)
+Reserved names forbidden.
+DB initialization must be tested immediately.
 
-**This project already has these dependencies installed:**
+============================================================
+RULE 12 — Docker Configuration 🟠
+============================================================
 
-```json
-// package.json dependencies (already installed)
-{
-  "xlsx": "^0.18.5",        // Excel file reading/writing
-  "tesseract.js": "^5.1.1", // Browser-based OCR
-  "lucide-react": "^0.468.0" // Icons
-}
-```
+All env vars required.
+Connectivity must be verified.
 
-**Use xlsx (NOT pandas) for reading Excel files:**
+============================================================
+RULE 13 — Python Version Compatibility 🟡
+============================================================
 
-```javascript
-// ✅ CORRECT - Use project's xlsx dependency
-const XLSX = require('xlsx');
-const wb = XLSX.readFile('/path/to/file.xlsx');
-const ws = wb.Sheets[wb.SheetNames[0]];
-const data = XLSX.utils.sheet_to_json(ws);
+Use Python 3.11 or 3.12 only.
 
-// ❌ WRONG - pandas is NOT installed in this environment
-import pandas as pd  // ModuleNotFoundError
-```
+============================================================
+RULE 14 — Database Alignment 🟡
+============================================================
 
-**Available in Node.js environment:**
-- xlsx - Excel reading/writing
-- All npm packages in node_modules/
+DB type may not change without approval.
+Preserve export paths.
 
-**NOT available:**
-- pandas (Python, not installed)
-- openpyxl (Python, not installed)
+============================================================
+RULE 15 — Tone After Errors 🔵
+============================================================
 
----
+Neutral. Technical. Factual. No celebration.
 
----
+============================================================
+RULE 16 — Workflow Context Preservation 🟠
+============================================================
 
-## Rule 31: Action-First, Ask-Later (ANTI-QUESTION RULE)
+Understand and preserve the COMPLETE user workflow.
+No isolated assumptions.
 
-**Evidence:** User said "reword requests" 2+ times in session (2025-12-26)
+============================================================
+RULE 17 — Data Format Compatibility 🟠
+============================================================
 
-**Do NOT end responses with:**
-- "Would you like me to..."
-- "What would you like me to do next?"
-- "Should I proceed with..."
-- Multiple choice questions
+External formats must remain compatible.
+Never rename columns silently.
 
-**Proceed to next logical step unless blocked by:**
-- Destructive action requiring permission (delete, push, deploy)
-- True ambiguity with competing interpretations
-- Missing critical information
+============================================================
+RULE 18 — Feature Removal Prohibition 🔴
+============================================================
 
----
+No feature removal without explicit permission.
 
-## Rule 32: Prefer Project Scripts Over Generic Commands
+============================================================
+RULE 19 — OCR Data Handling 🟡
+============================================================
 
-**Evidence:** User corrected: "do not @rules show that ./start.sh should be running" after port conflicts
+Never auto-delete OCR noise.
+Provide cleanup tools only.
 
-**BEFORE using generic commands:**
-```bash
-# 1. Check for project scripts
-ls *.sh
+============================================================
+RULE 20 — UI State Preservation 🟡
+============================================================
 
-# 2. If start.sh/stop.sh exist, use them
-./start.sh  # NOT npm run dev
-./stop.sh   # NOT pkill node
-```
+Persist preferences.
+Handle corruption gracefully.
 
-**Why:** Project scripts handle port cleanup, PID tracking, stray processes
+============================================================
+RULE 21 — Task Completion Evidence 🟠
+============================================================
 
----
+When complete, provide:
+1. Request summary
+2. Actions taken
+3. Full evidence
+4. Requirement-to-evidence mapping
 
-## Rule 33: Concise Response Format
+============================================================
+RULE 22 — Complete Workflow Testing 🔴
+============================================================
 
-**Evidence:** Verbose explanations wasted user time scanning for results (2025-12-26)
+Backend and UI workflows must be proven with screenshots, logs, and data checks.
 
-**Required format:**
-```
-### Step N: [action]
-**Rules:** [numbers, e.g., 2, 26, 27]
-**Command:** [code block]
-**Evidence:** [1-2 line summary + raw output]
-**Status:** ✅ or ❌
-```
+============================================================
+RULE 23 — Use Existing Browser Window (Deprecated)
+============================================================
 
-**Forbidden:**
-- Long explanations before actions
-- Repeating what was just done
-- "I will now..." preambles
+See Rule 26.
 
----
+============================================================
+RULE 24 — Test Before Push 🔴
+============================================================
 
-## Other Critical Rules
+Never push broken code.
+All tests must pass with evidence.
 
-**Rule 4: Scope Containment** - Fix only what's requested, don't expand scope
+============================================================
+RULE 25 — Debug in UI, Not Console 🟠
+============================================================
 
-**Rule 18: Feature Removal Prohibition** - Never remove features without permission
+Debug output must be visible in UI.
 
-**Rule 24: Test Before Push** - Never push broken code
+============================================================
+RULE 26 — Use Existing Browser Window 🟠
+============================================================
 
-**Rule 25: Display Debug in UI** - Add debug logs to UI, not just console
+Use xdotool + xprop command exactly as specified.
+No new browser instances if existing window exists.
 
----
+============================================================
+RULE 27 — Screenshot Claims Require OCR 🟠
+============================================================
 
-## Enforcement
+No visual claims without OCR text and screenshot display.
 
-**If assistant violates any rule:**
-1. User MUST stop immediately
-2. Cite rule number
-3. Require restart with proper pattern
+============================================================
+RULE 28 — Application Parameters Database 🟠
+============================================================
 
----
+Read and quote parameters before use.
+No guessing.
 
-**Full rules**: See `RULES_AUDIT_2025-12-26.json` for evidence-backed audit
+============================================================
+RULE 29 — Terminal Output Capture 🟠
+============================================================
 
+Use heredoc format exclusively.
+Monitor session count.
+
+============================================================
+RULE 30 — Project Dependencies 🟡
+============================================================
+
+Use installed dependencies only.
+No environment assumptions.
+
+============================================================
+RULE 31 — Proceed With Obvious Next Steps 🟡
+============================================================
+
+Auto-proceed ONLY if:
+- Non-destructive
+- No ambiguity
+- No rule conflict
+- Evidence can be produced immediately
+
+Otherwise, ask under Rule 5.
+
+============================================================
+RULE 32 — Prefer Project Scripts 🟡
+============================================================
+
+Use project scripts before generic commands.
+
+============================================================
+RULE 33 — Concise Response Format 🔵
+============================================================
+
+Each step MUST follow:
+
+### Step N
+Rules:
+Command:
+Evidence:
+Status:
+
+============================================================
+RULE 34 — Debugging Uses Tools First 🔴
+============================================================
+
+Lint → Clear cache → Verify → Manual review (only last).
+
+============================================================
+RULE 35 — Browser Priority for Selenium 🟠
+============================================================
+
+Firefox → Chromium → Chrome, with explicit evidence.
+
+============================================================
+RULE 36 — Full Error Console Messages 🔴
+============================================================
+
+No truncated errors. Full stack traces required.
+
+============================================================
+RULE 37 — No Partial Compliance 🔴
+============================================================
+
+Partial compliance = non-compliance.
+If full compliance is impossible → STOP and explain.
+
+============================================================
+RULE 38 — Violation Memory 🔴
+============================================================
+
+Any violation MUST be:
+- Logged
+- Cited by rule number
+- Referenced before next step
+
+============================================================
+RULE 39 — Evidence Persistence (NEW) 🔴
+============================================================
+
+ALL evidence must be saved to files for user verification.
+
+MANDATORY WORKFLOW:
+
+1. BEFORE any action:
+   - Capture current state
+   - Save to /tmp/before_[action]_[timestamp].txt
+
+2. DURING action:
+   - Save all command output to /tmp/[action]_output.txt
+   - Use `tee` to show AND save simultaneously
+
+3. AFTER action:
+   - Capture new state
+   - Save to /tmp/after_[action]_[timestamp].txt
+
+4. COMPARISON:
+   - Create /tmp/[action]_comparison.txt showing before/after diff
+
+REQUIRED FILE NAMING:
+- /tmp/errors_before_YYYYMMDD_HHMMSS.txt
+- /tmp/errors_after_YYYYMMDD_HHMMSS.txt
+- /tmp/build_output_YYYYMMDD_HHMMSS.txt
+- /tmp/screenshot_YYYYMMDD_HHMMSS.png
+
+FORBIDDEN:
+- Showing output without saving to file
+- Claiming "evidence shown" without file path
+- Deleting evidence files before user confirms
+
+============================================================
+RULE 40 — No Excuses, Find a Way (NEW) 🔴
+============================================================
+
+When user requests evidence, NEVER claim it's impossible.
+
+FORBIDDEN RESPONSES:
+- "I cannot prove it now because..."
+- "The errors are already fixed so..."
+- "I don't have access to..."
+- "It's too late to..."
+
+REQUIRED APPROACH:
+
+1. ACKNOWLEDGE THE REQUEST
+   - "You asked for [specific evidence]"
+
+2. PROPOSE SOLUTION
+   - "I can obtain this by [method]"
+   - Example: "I can stash changes, capture errors, then restore"
+
+3. ASK FOR PERMISSION IF RISKY
+   - "This requires [action]. May I proceed?"
+
+4. EXECUTE AND PROVIDE EVIDENCE
+   - Show the evidence in the format requested
+   - Save to files per Rule 37
+
+EXAMPLES:
+
+❌ WRONG:
+"I cannot show the original 40 errors because I already fixed them."
+
+✅ CORRECT:
+"You asked for the original error list. I can:
+1. Stash my current changes
+2. Run build to capture all errors
+3. Save to /tmp/errors_before.txt
+4. Restore my changes
+May I proceed?"
+
+============================================================
+FINAL STEP — Compliance Self-Audit 🔴
+============================================================
+
+Every response MUST end with:
+
+COMPLIANCE AUDIT:
+- Rules applied:
+- Evidence provided: YES/NO
+- Violations: YES/NO
+- Safe to proceed: YES/NO

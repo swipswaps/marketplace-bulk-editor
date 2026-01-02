@@ -70,21 +70,72 @@ ls -la | head -10
 
 ## Selenium Best Practices
 
-### Use Chrome with CDP for Console Logging
+### Browser Priority (Rule 29)
+
+**ALWAYS follow this priority when creating Selenium tests:**
+
+1. **Firefox** (first choice)
+   - Check for existing Firefox window with marketplace-bulk-editor (Rule 26)
+   - If found, note it but create new instance for full Selenium control
+   - If not found, create new Firefox instance
+
+2. **Chromium** (second choice)
+   - If Firefox not available, try Chromium
+
+3. **Chrome** (third choice)
+   - If Chromium not available, use Chrome
+
+**Example implementation:**
 
 ```python
 from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
 
-options = Options()
-options.set_capability('goog:loggingPrefs', {'browser': 'ALL'})
+def setup_driver():
+    """Setup WebDriver with browser priority: Firefox → Chromium → Chrome"""
 
-driver = webdriver.Chrome(options=options)
+    # Try Firefox first
+    try:
+        from selenium.webdriver.firefox.options import Options as FirefoxOptions
+        firefox_options = FirefoxOptions()
+        firefox_options.set_preference('devtools.console.stdout.content', True)
+        driver = webdriver.Firefox(options=firefox_options)
+        print("✅ Using Firefox")
+        return driver
+    except Exception as e:
+        print(f"⚠️  Firefox not available: {e}")
+
+    # Try Chromium second
+    try:
+        from selenium.webdriver.chrome.options import Options as ChromeOptions
+        chromium_options = ChromeOptions()
+        chromium_options.binary_location = "/usr/bin/chromium"
+        chromium_options.set_capability('goog:loggingPrefs', {'browser': 'ALL'})
+        driver = webdriver.Chrome(options=chromium_options)
+        print("✅ Using Chromium")
+        return driver
+    except Exception as e:
+        print(f"⚠️  Chromium not available: {e}")
+
+    # Try Chrome last
+    try:
+        from selenium.webdriver.chrome.options import Options as ChromeOptions
+        chrome_options = ChromeOptions()
+        chrome_options.set_capability('goog:loggingPrefs', {'browser': 'ALL'})
+        driver = webdriver.Chrome(options=chrome_options)
+        print("✅ Using Chrome")
+        return driver
+    except Exception as e:
+        raise Exception("No browser available")
+
+driver = setup_driver()
 driver.get("http://localhost:5173")
 
-# Capture console logs
-for entry in driver.get_log('browser'):
-    print(entry)
+# Capture console logs (Chrome/Chromium only)
+try:
+    for entry in driver.get_log('browser'):
+        print(entry)
+except:
+    print("Console logs not available (Firefox doesn't support get_log)")
 ```
 
 ### Test Workflow

@@ -32,12 +32,15 @@ def upload_file(current_user):
     """Upload file for OCR processing"""
     if 'file' not in request.files:
         return jsonify({'error': 'No file provided'}), 400
-    
+
     file = request.files['file']
-    
+
     if file.filename == '':
         return jsonify({'error': 'No file selected'}), 400
-    
+
+    # Get optional OCR engine parameter (paddleocr, tesseract, both)
+    ocr_engine = request.form.get('ocr_engine', 'paddleocr')
+
     try:
         # Save file
         file_path = save_upload_file(file, 'ocr')
@@ -52,6 +55,7 @@ def upload_file(current_user):
             file_path=file_path,
             file_size=file_size,
             file_type=file.content_type,
+            ocr_engine=ocr_engine,
             status='processing'
         )
 

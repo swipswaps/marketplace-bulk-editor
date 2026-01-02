@@ -19,13 +19,15 @@ class OCRScan(db.Model):
     file_path = db.Column(db.String(500), nullable=True)
     file_size = db.Column(db.Integer, nullable=True)
     file_type = db.Column(db.String(50), nullable=True)
-    
+    thumbnail_path = db.Column(db.String(500), nullable=True)  # Preview image path
+
     # OCR processing
     status = db.Column(db.String(20), default='pending', nullable=False)  # pending, processing, completed, failed
+    ocr_engine = db.Column(db.String(20), nullable=True)  # paddleocr, tesseract, both
     ocr_text = db.Column(db.Text, nullable=True)
     extracted_data = db.Column(db.JSON, nullable=True)  # Parsed product data
     error_message = db.Column(db.Text, nullable=True)
-    
+
     # Processing metadata
     processing_time = db.Column(db.Float, nullable=True)  # seconds
     items_extracted = db.Column(db.Integer, default=0, nullable=False)
@@ -47,7 +49,9 @@ class OCRScan(db.Model):
             'filename': self.filename,
             'file_size': self.file_size,
             'file_type': self.file_type,
+            'thumbnail_path': self.thumbnail_path,
             'status': self.status,
+            'ocr_engine': self.ocr_engine,
             'ocr_text': self.ocr_text,
             'extracted_data': self.extracted_data,
             'error_message': self.error_message,

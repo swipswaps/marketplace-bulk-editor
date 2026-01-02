@@ -1,0 +1,26 @@
+{
+  "name": "marketplace-scraper-backend",
+  "version": "1.0.0",
+  "description": "Playwright-based scraper for eBay, Facebook Marketplace, Amazon, Salvex",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "install-browsers": "npx playwright install chromium"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "playwright": "^1.42.0"
+  },
+  "keywords": [
+    "scraper",
+    "playwright",
+    "ebay",
+    "facebook-marketplace",
+    "amazon"
+  ],
+  "author": "",
+  "license": "MIT"
+}
+

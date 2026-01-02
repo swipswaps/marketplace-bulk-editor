@@ -1,12 +1,23 @@
 /**
  * Analytics Dashboard Component
  * Displays statistics and insights about marketplace listings
- * Enhanced with Recharts visualizations and user-selectable charts
+ * Enhanced with D3.js visualizations and backend API integration
  */
 
-import { useMemo, useState } from 'react';
-import { BarChart3, DollarSign, Package, TrendingUp, Settings, Eye, EyeOff } from 'lucide-react';
+import { useMemo, useState, useEffect } from 'react';
+import { BarChart3, DollarSign, Package, TrendingUp, Settings, Eye, EyeOff, RefreshCw } from 'lucide-react';
 import type { MarketplaceListing } from '../types';
+import { apiClient } from '../utils/api';
+import { useAuth } from '../contexts/AuthContext';
+import {
+  PriceDistributionChart,
+  CategoryBreakdownChart,
+  TimeSeriesChart,
+  TrendsChart,
+  ShippingDistributionChart,
+  ConditionDistributionChart
+} from './charts';
+import { ChartCarousel } from './ChartCarousel';
 
 // Color palette for charts
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D', '#FFC658', '#FF6B6B'];
@@ -16,22 +27,115 @@ interface AnalyticsDashboardProps {
 }
 
 // Chart visibility options
-type ChartType = 'summaryCards' | 'wordCloud';
+type ChartType = 'summaryCards' | 'wordCloud' | 'priceDistribution' | 'categoryBreakdown' | 'timeSeries' | 'trends' | 'shippingDistribution' | 'conditionDistribution';
+
+// Backend API response types
+interface PriceDistributionData {
+  bins: Array<{ min: number; max: number; count: number; percentage: number }>;
+  statistics: { mean: number; median: number; count: number; min: number; max: number };
+}
+
+interface TimeSeriesData {
+  data: Array<{ date: string; count: number; total_value: number }>;
+  period: string;
+  days_back: number;
+}
+
+interface TrendsData {
+  top_categories: Array<{ category: string; count: number; avg_price: number }>;
+  top_conditions: Array<{ condition: string; count: number; avg_price: number }>;
+  recent_activity: { last_7_days: number };
+}
 
 export function AnalyticsDashboard({ data }: AnalyticsDashboardProps) {
+  const { isAuthenticated } = useAuth();
+
   // Chart visibility state - all visible by default
   const [visibleCharts, setVisibleCharts] = useState<Record<ChartType, boolean>>({
     summaryCards: true,
     wordCloud: true,
+    priceDistribution: true,
+    categoryBreakdown: true,
+    timeSeries: true,
+    trends: true,
+    shippingDistribution: true,
+    conditionDistribution: true,
   });
   const [showChartSettings, setShowChartSettings] = useState(false);
 
   // Word cloud selection state
   const [selectedWord, setSelectedWord] = useState<string | null>(null);
 
+  // Backend analytics data
+  const [priceDistribution, setPriceDistribution] = useState<PriceDistributionData | null>(null);
+  const [timeSeries, setTimeSeries] = useState<TimeSeriesData | null>(null);
+  const [trends, setTrends] = useState<TrendsData | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
   const toggleChart = (chart: ChartType) => {
     setVisibleCharts(prev => ({ ...prev, [chart]: !prev[chart] }));
   };
+
+  const showAllCharts = () => {
+    setVisibleCharts({
+      summaryCards: true,
+      wordCloud: true,
+      priceDistribution: true,
+      categoryBreakdown: true,
+      timeSeries: true,
+      trends: true,
+      shippingDistribution: true,
+      conditionDistribution: true,
+    });
+  };
+
+  const hideAllCharts = () => {
+    setVisibleCharts({
+      summaryCards: false,
+      wordCloud: false,
+      priceDistribution: false,
+      categoryBreakdown: false,
+      timeSeries: false,
+      trends: false,
+      shippingDistribution: false,
+      conditionDistribution: false,
+    });
+  };
+
+  // Fetch analytics data from backend
+  const fetchAnalytics = async () => {
+    if (!isAuthenticated || !data.length) return;
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      // Fetch all analytics endpoints in parallel
+      const [priceDistData, timeSeriesData, trendsData] = await Promise.all([
+        apiClient.get<PriceDistributionData>('/api/analytics/price-distribution?bins=10'),
+        apiClient.get<TimeSeriesData>('/api/analytics/time-series?period=day&days=30'),
+        apiClient.get<TrendsData>('/api/analytics/trends')
+      ]);
+
+      setPriceDistribution(priceDistData);
+      setTimeSeries(timeSeriesData);
+      setTrends(trendsData);
+    } catch (err) {
+      console.error('Failed to fetch analytics:', err);
+      setError('Failed to load analytics from backend. Using local data only.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch analytics when authenticated and data changes
+  useEffect(() => {
+    if (isAuthenticated && data.length > 0) {
+      fetchAnalytics();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, data.length]);
 
   // Filter listings by selected word (searches all fields, same as DataTable search)
   const filteredByWord = useMemo(() => {
@@ -59,6 +163,11 @@ export function AnalyticsDashboard({ data }: AnalyticsDashboardProps) {
         totalValue: 0,
         priceRange: { min: 0, max: 0 },
         wordFrequency: [] as { text: string; value: number }[],
+        shippingData: [] as { shipping: string; count: number; percentage: number }[],
+        conditionData: [] as { condition: string; count: number; percentage: number; avgPrice: number }[],
+        dataQuality: { complete: 0, missingTitle: 0, missingDescription: 0, missingPrice: 0, completeness: 0 },
+        titleLengthStats: { avgLength: 0, tooShort: 0, tooLong: 0, optimal: 0 },
+        shippingPriceComparison: { withShipping: 0, withoutShipping: 0, difference: 0 },
       };
     }
 
@@ -81,6 +190,75 @@ export function AnalyticsDashboard({ data }: AnalyticsDashboardProps) {
       .slice(0, 50)
       .map(([text, value]) => ({ text, value }));
 
+    // Shipping distribution
+    const shippingCounts: Record<string, number> = {};
+    data.forEach(item => {
+      const shipping = String(item['OFFER SHIPPING'] || 'No');
+      shippingCounts[shipping] = (shippingCounts[shipping] || 0) + 1;
+    });
+    const shippingData = Object.entries(shippingCounts).map(([shipping, count]) => ({
+      shipping,
+      count,
+      percentage: (count / data.length) * 100,
+    }));
+
+    // Condition distribution with avg price
+    const conditionCounts: Record<string, { count: number; totalPrice: number }> = {};
+    data.forEach(item => {
+      const condition = String(item.CONDITION || 'Unknown');
+      const price = parseFloat(String(item.PRICE)) || 0;
+      if (!conditionCounts[condition]) {
+        conditionCounts[condition] = { count: 0, totalPrice: 0 };
+      }
+      conditionCounts[condition].count++;
+      conditionCounts[condition].totalPrice += price;
+    });
+    const conditionData = Object.entries(conditionCounts).map(([condition, { count, totalPrice }]) => ({
+      condition,
+      count,
+      percentage: (count / data.length) * 100,
+      avgPrice: totalPrice / count,
+    }));
+
+    // Data quality metrics
+    let complete = 0;
+    let missingTitle = 0;
+    let missingDescription = 0;
+    let missingPrice = 0;
+    data.forEach(item => {
+      const hasTitle = String(item.TITLE || '').trim().length > 0;
+      const hasDescription = String(item.DESCRIPTION || '').trim().length > 0;
+      const hasPrice = parseFloat(String(item.PRICE)) > 0;
+
+      if (!hasTitle) missingTitle++;
+      if (!hasDescription) missingDescription++;
+      if (!hasPrice) missingPrice++;
+      if (hasTitle && hasDescription && hasPrice) complete++;
+    });
+    const completeness = (complete / data.length) * 100;
+
+    // Title length statistics (Facebook Marketplace limit: 150 chars)
+    const titleLengths = data.map(item => String(item.TITLE || '').length);
+    const avgLength = titleLengths.reduce((sum, len) => sum + len, 0) / data.length;
+    const tooShort = titleLengths.filter(len => len < 20).length;
+    const tooLong = titleLengths.filter(len => len > 150).length;
+    const optimal = titleLengths.filter(len => len >= 20 && len <= 150).length;
+
+    // Shipping price comparison
+    const withShippingPrices = data
+      .filter(item => String(item['OFFER SHIPPING']) === 'Yes')
+      .map(item => parseFloat(String(item.PRICE)) || 0);
+    const withoutShippingPrices = data
+      .filter(item => String(item['OFFER SHIPPING']) !== 'Yes')
+      .map(item => parseFloat(String(item.PRICE)) || 0);
+
+    const avgWithShipping = withShippingPrices.length > 0
+      ? withShippingPrices.reduce((sum, p) => sum + p, 0) / withShippingPrices.length
+      : 0;
+    const avgWithoutShipping = withoutShippingPrices.length > 0
+      ? withoutShippingPrices.reduce((sum, p) => sum + p, 0) / withoutShippingPrices.length
+      : 0;
+
     return {
       totalListings: data.length,
       averagePrice,
@@ -90,6 +268,15 @@ export function AnalyticsDashboard({ data }: AnalyticsDashboardProps) {
         max: Math.max(...prices),
       },
       wordFrequency,
+      shippingData,
+      conditionData,
+      dataQuality: { complete, missingTitle, missingDescription, missingPrice, completeness },
+      titleLengthStats: { avgLength, tooShort, tooLong, optimal },
+      shippingPriceComparison: {
+        withShipping: avgWithShipping,
+        withoutShipping: avgWithoutShipping,
+        difference: avgWithShipping - avgWithoutShipping
+      },
     };
   }, [data]);
 
@@ -107,24 +294,66 @@ export function AnalyticsDashboard({ data }: AnalyticsDashboardProps) {
       {/* Chart Settings Toggle */}
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Analytics Dashboard</h2>
-        <button
-          onClick={() => setShowChartSettings(!showChartSettings)}
-          className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-          aria-label="Toggle chart settings"
-        >
-          <Settings size={16} />
-          Chart Settings
-        </button>
+        <div className="flex gap-2">
+          {isAuthenticated && (
+            <button
+              onClick={fetchAnalytics}
+              disabled={loading}
+              className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors disabled:opacity-50"
+              aria-label="Refresh analytics"
+            >
+              <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+              Refresh
+            </button>
+          )}
+          <button
+            onClick={() => setShowChartSettings(!showChartSettings)}
+            className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+            aria-label="Toggle chart settings"
+          >
+            <Settings size={16} />
+            Chart Settings
+          </button>
+        </div>
       </div>
+
+      {/* Error Message */}
+      {error && (
+        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+          <p className="text-sm text-yellow-800 dark:text-yellow-200">{error}</p>
+        </div>
+      )}
 
       {/* Chart Visibility Controls */}
       {showChartSettings && (
         <div className="bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-          <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Select Charts to Display:</h3>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Select Charts to Display:</h3>
+            <div className="flex gap-2">
+              <button
+                onClick={showAllCharts}
+                className="px-3 py-1 text-xs font-medium text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/30 border border-blue-300 dark:border-blue-700 rounded hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors"
+              >
+                Show All
+              </button>
+              <button
+                onClick={hideAllCharts}
+                className="px-3 py-1 text-xs font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+              >
+                Hide All
+              </button>
+            </div>
+          </div>
           <div className="flex flex-wrap gap-3">
             {([
               { key: 'summaryCards', label: 'Summary Cards' },
               { key: 'wordCloud', label: 'Word Cloud' },
+              { key: 'priceDistribution', label: 'Price Distribution' },
+              { key: 'categoryBreakdown', label: 'Category Breakdown' },
+              { key: 'timeSeries', label: 'Time Series' },
+              { key: 'trends', label: 'Trends' },
+              { key: 'shippingDistribution', label: 'Shipping Distribution' },
+              { key: 'conditionDistribution', label: 'Condition Distribution' },
             ] as const).map(({ key, label }) => (
               <button
                 key={key}
@@ -181,6 +410,60 @@ export function AnalyticsDashboard({ data }: AnalyticsDashboardProps) {
                 <p className="text-sm text-orange-600 dark:text-orange-400 font-medium">Price Range</p>
                 <p className="text-lg font-bold text-orange-900 dark:text-orange-100">
                   ${stats.priceRange.min.toLocaleString()} - ${stats.priceRange.max.toLocaleString()}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* New Marketplace-Specific Summary Cards */}
+      {visibleCharts.summaryCards && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {/* Data Quality Card */}
+          <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-lg p-4">
+            <div className="flex items-center gap-3">
+              <Package className="text-indigo-600 dark:text-indigo-400" size={24} />
+              <div>
+                <p className="text-sm text-indigo-600 dark:text-indigo-400 font-medium">Data Quality</p>
+                <p className="text-2xl font-bold text-indigo-900 dark:text-indigo-100">
+                  {stats.dataQuality.completeness.toFixed(1)}%
+                </p>
+                <p className="text-xs text-indigo-600 dark:text-indigo-400 mt-1">
+                  {stats.dataQuality.complete} complete listings
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Title Length Card */}
+          <div className="bg-cyan-50 dark:bg-cyan-900/20 border border-cyan-200 dark:border-cyan-800 rounded-lg p-4">
+            <div className="flex items-center gap-3">
+              <BarChart3 className="text-cyan-600 dark:text-cyan-400" size={24} />
+              <div>
+                <p className="text-sm text-cyan-600 dark:text-cyan-400 font-medium">Avg Title Length</p>
+                <p className="text-2xl font-bold text-cyan-900 dark:text-cyan-100">
+                  {stats.titleLengthStats.avgLength.toFixed(0)} chars
+                </p>
+                <p className="text-xs text-cyan-600 dark:text-cyan-400 mt-1">
+                  {stats.titleLengthStats.optimal} within FB limit (150)
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Shipping Price Comparison Card */}
+          <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg p-4">
+            <div className="flex items-center gap-3">
+              <TrendingUp className="text-emerald-600 dark:text-emerald-400" size={24} />
+              <div>
+                <p className="text-sm text-emerald-600 dark:text-emerald-400 font-medium">Shipping Impact</p>
+                <p className="text-2xl font-bold text-emerald-900 dark:text-emerald-100">
+                  {stats.shippingPriceComparison.difference >= 0 ? '+' : ''}
+                  ${stats.shippingPriceComparison.difference.toFixed(2)}
+                </p>
+                <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">
+                  Avg price difference with shipping
                 </p>
               </div>
             </div>
@@ -268,6 +551,56 @@ export function AnalyticsDashboard({ data }: AnalyticsDashboardProps) {
         </div>
       )}
 
+      {/* D3.js Charts - Backend API Integration with Carousel */}
+      {isAuthenticated && (
+        <ChartCarousel>
+          {[
+            // Price Distribution Chart
+            visibleCharts.priceDistribution && priceDistribution && (
+              <PriceDistributionChart key="price-dist" data={priceDistribution} />
+            ),
+
+            // Category Breakdown Chart
+            visibleCharts.categoryBreakdown && trends && trends.top_categories.length > 0 && (
+              <CategoryBreakdownChart key="category-breakdown" data={trends.top_categories} />
+            ),
+
+            // Time Series Chart
+            visibleCharts.timeSeries && timeSeries && timeSeries.data.length > 0 && (
+              <TimeSeriesChart key="time-series" data={timeSeries.data} />
+            ),
+
+            // Trends Chart - Categories
+            visibleCharts.trends && trends && trends.top_categories.length > 0 && (
+              <TrendsChart key="trends-categories" data={trends.top_categories} type="category" />
+            ),
+
+            // Trends Chart - Conditions
+            visibleCharts.trends && trends && trends.top_conditions.length > 0 && (
+              <TrendsChart key="trends-conditions" data={trends.top_conditions} type="condition" />
+            ),
+
+            // Shipping Distribution Chart (frontend-only, always available)
+            visibleCharts.shippingDistribution && stats.shippingData.length > 0 && (
+              <ShippingDistributionChart key="shipping-dist" data={stats.shippingData} />
+            ),
+
+            // Condition Distribution Chart (frontend-only, always available)
+            visibleCharts.conditionDistribution && stats.conditionData.length > 0 && (
+              <ConditionDistributionChart key="condition-dist" data={stats.conditionData} />
+            ),
+          ].filter(Boolean) as React.ReactNode[]}
+        </ChartCarousel>
+      )}
+
+      {/* Not Authenticated Message */}
+      {!isAuthenticated && (
+        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6 text-center">
+          <p className="text-blue-800 dark:text-blue-200">
+            Login to view advanced analytics charts powered by the backend API
+          </p>
+        </div>
+      )}
 
     </div>
   );

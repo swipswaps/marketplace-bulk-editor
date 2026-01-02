@@ -6,6 +6,7 @@ export interface MarketplaceListing {
   DESCRIPTION: string;
   CATEGORY: string;
   'OFFER SHIPPING': string;
+  PHOTOS?: string; // Semicolon-separated photo URLs or file paths
   _autoFilled?: AutoFilledField[]; // Track which fields were auto-filled during import
 }
 

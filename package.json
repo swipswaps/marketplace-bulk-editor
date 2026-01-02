@@ -11,7 +11,11 @@
     "deploy": "npm run build && gh-pages -d dist"
   },
   "dependencies": {
+    "@headlessui/react": "^2.2.9",
     "@tailwindcss/typography": "^0.5.19",
+    "@types/d3": "^7.4.3",
+    "d3": "^7.9.0",
+    "embla-carousel-react": "^8.6.0",
     "lucide-react": "^0.561.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",

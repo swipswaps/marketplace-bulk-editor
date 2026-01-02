@@ -559,16 +559,19 @@ export function FileUpload({ onDataLoaded, onTemplateDetected, currentTemplate, 
     multiple: true
   });
 
-  // Compact mode - just a button in the header
+  // Compact mode - just an icon button with tooltip
   if (compact) {
     return (
       <>
         <div className="flex items-center gap-2">
           <div {...getRootProps()}>
             <input {...getInputProps()} />
-            <button className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-              <Upload size={16} />
-              Import More
+            <button
+              className="p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              title="Import More - Upload additional files"
+              aria-label="Import More - Upload additional files"
+            >
+              <Upload size={20} />
             </button>
           </div>
 

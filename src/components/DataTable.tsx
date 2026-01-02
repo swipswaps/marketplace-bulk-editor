@@ -4,6 +4,7 @@ import { Trash2, Plus, Copy, Eye, MoreVertical, X, ExternalLink } from 'lucide-r
 import type { MarketplaceListing } from '../types';
 import { CONDITIONS } from '../types';
 import { validateListing } from '../utils/validation';
+import { ConfirmDialog } from './ConfirmDialog';
 
 // Helper to generate search URLs for price comparison
 const generateSearchUrls = (title: string) => {
@@ -72,6 +73,19 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
     scope: 'all' | 'selected';
     value: string;
   }>({ show: false, field: null, scope: 'all', value: '' });
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmText: string;
+    onConfirm: (dontAskAgain: boolean) => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    confirmText: 'Confirm',
+    onConfirm: () => {},
+  });
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
     TITLE: 250,
     PRICE: 100,
@@ -81,8 +95,24 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
     'OFFER SHIPPING': 120,
   });
   const [resizing, setResizing] = useState<{ column: string; startX: number; startWidth: number; colIndex: number } | null>(null);
+
+  // Pagination state - persisted to localStorage
+  const [currentPage, setCurrentPage] = useState<number>(() => {
+    const saved = localStorage.getItem('tableCurrentPage');
+    return saved ? parseInt(saved, 10) : 1;
+  });
+  const [rowsPerPage, setRowsPerPage] = useState<number>(() => {
+    const saved = localStorage.getItem('tableRowsPerPage');
+    // Default: 25 on mobile, 50 on desktop
+    const defaultRows = window.innerWidth < 768 ? 25 : 50;
+    return saved ? parseInt(saved, 10) : defaultRows;
+  });
+
   const tableRef = useRef<HTMLTableElement>(null);
   const priceDropdownRef = useRef<HTMLDivElement>(null);
+  const topScrollRef = useRef<HTMLDivElement>(null);
+  const bottomScrollRef = useRef<HTMLDivElement>(null);
+  const [topScrollWidth, setTopScrollWidth] = useState<number>(0);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -97,6 +127,22 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [showPriceDropdown]);
+
+  // Persist pagination state to localStorage
+  useEffect(() => {
+    localStorage.setItem('tableCurrentPage', currentPage.toString());
+  }, [currentPage]);
+
+  useEffect(() => {
+    localStorage.setItem('tableRowsPerPage', rowsPerPage.toString());
+  }, [rowsPerPage]);
+
+  // Reset to page 1 when search/filter changes
+  // This is intentional - we need to reset pagination when search changes
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setCurrentPage(1);
+  }, [searchQuery]);
 
   // Extract unique values from all listings for autocomplete
   const uniqueCategories = Array.from(
@@ -192,10 +238,29 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
   }, [data, onUpdate]);
 
   const handleDelete = useCallback((id: string) => {
-    if (confirm('Are you sure you want to delete this listing?')) {
+    // Check if user has disabled delete confirmation
+    const skipDeleteConfirm = localStorage.getItem('skipDeleteConfirm') === 'true';
+
+    if (skipDeleteConfirm) {
       onUpdate(data.filter(item => item.id !== id));
+      return;
     }
-  }, [data, onUpdate]);
+
+    // Show confirmation dialog
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Delete Listing',
+      message: 'Are you sure you want to delete this listing?\n\nThis action cannot be undone.',
+      confirmText: 'Delete',
+      onConfirm: (dontAskAgain) => {
+        if (dontAskAgain) {
+          localStorage.setItem('skipDeleteConfirm', 'true');
+        }
+        onUpdate(data.filter(item => item.id !== id));
+        setConfirmDialog({ ...confirmDialog, isOpen: false });
+      },
+    });
+  }, [data, onUpdate, confirmDialog]);
 
   const handleDuplicate = useCallback((id: string) => {
     const listingToDuplicate = data.find(item => item.id === id);
@@ -226,17 +291,32 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
   const handleBulkDelete = () => {
     if (selectedRows.size === 0) return;
 
-    const userConfirmed = confirm(`Delete ${selectedRows.size} selected listing(s)?`);
+    // Check if user has disabled bulk delete confirmation
+    const skipBulkDeleteConfirm = localStorage.getItem('skipBulkDeleteConfirm') === 'true';
 
-    if (userConfirmed) {
+    if (skipBulkDeleteConfirm) {
       const updatedData = data.filter(item => !selectedRows.has(item.id));
       onUpdate(updatedData);
       setSelectedRows(new Set());
-
-      // Show save indicator
-      setLastSaved(new Date().toLocaleTimeString());
-      setTimeout(() => setLastSaved(null), 2000);
+      return;
     }
+
+    // Show confirmation dialog
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Delete Multiple Listings',
+      message: `Are you sure you want to delete ${selectedRows.size} selected listing(s)?\n\nThis action cannot be undone.`,
+      confirmText: 'Delete All',
+      onConfirm: (dontAskAgain) => {
+        if (dontAskAgain) {
+          localStorage.setItem('skipBulkDeleteConfirm', 'true');
+        }
+        const updatedData = data.filter(item => !selectedRows.has(item.id));
+        onUpdate(updatedData);
+        setSelectedRows(new Set());
+        setConfirmDialog({ ...confirmDialog, isOpen: false });
+      },
+    });
   };
 
   const handleBulkEdit = useCallback((field: keyof MarketplaceListing, value: string | number) => {
@@ -274,15 +354,36 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
 
     const removedCount = data.length - validListings.length;
     if (removedCount > 0) {
-      if (confirm(`Remove ${removedCount} empty/invalid row(s)?`)) {
+      // Check if user has disabled remove empty rows confirmation
+      const skipRemoveEmptyConfirm = localStorage.getItem('skipRemoveEmptyConfirm') === 'true';
+
+      if (skipRemoveEmptyConfirm) {
         onUpdate(validListings);
         setLastSaved(new Date().toLocaleTimeString());
         setTimeout(() => setLastSaved(null), 2000);
+        return;
       }
+
+      // Show confirmation dialog
+      setConfirmDialog({
+        isOpen: true,
+        title: 'Remove Empty Rows',
+        message: `Remove ${removedCount} empty/invalid row(s)?\n\nRows without TITLE, PRICE, or CONDITION will be removed.`,
+        confirmText: 'Remove',
+        onConfirm: (dontAskAgain) => {
+          if (dontAskAgain) {
+            localStorage.setItem('skipRemoveEmptyConfirm', 'true');
+          }
+          onUpdate(validListings);
+          setLastSaved(new Date().toLocaleTimeString());
+          setTimeout(() => setLastSaved(null), 2000);
+          setConfirmDialog({ ...confirmDialog, isOpen: false });
+        },
+      });
     } else {
       alert('No empty rows to remove!');
     }
-  }, [data, onUpdate]);
+  }, [data, onUpdate, confirmDialog]);
 
   const handleColumnBulkEdit = useCallback((field: keyof MarketplaceListing, scope: 'all' | 'selected') => {
     // Open modal for text/number fields
@@ -378,6 +479,22 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
     return sortDirection === 'asc' ? comparison : -comparison;
   });
 
+  // Pagination calculations
+  const totalRows = sortedData.length;
+  const totalPages = Math.ceil(totalRows / rowsPerPage);
+  const startIndex = (currentPage - 1) * rowsPerPage;
+  const endIndex = Math.min(startIndex + rowsPerPage, totalRows);
+  const paginatedData = sortedData.slice(startIndex, endIndex);
+
+  // Ensure current page is valid when data changes
+  // This is intentional - we need to adjust pagination when total pages decreases
+  useEffect(() => {
+    if (currentPage > totalPages && totalPages > 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setCurrentPage(totalPages);
+    }
+  }, [totalPages, currentPage]);
+
   // Close column action menu when clicking outside
   useEffect(() => {
     const handleClickOutside = () => {
@@ -469,8 +586,54 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [editingCell, focusedCell, data, visibleColumns, sortedData]);
 
+  // Synchronize top and bottom scrollbars
+  useEffect(() => {
+    const topScroll = topScrollRef.current;
+    const bottomScroll = bottomScrollRef.current;
+    const table = tableRef.current;
+
+    if (!topScroll || !bottomScroll || !table) return;
+
+    // Update top scrollbar width to match table width
+    const updateTopScrollWidth = () => {
+      const scrollContent = topScroll.querySelector('div');
+      if (scrollContent) {
+        scrollContent.style.width = `${table.scrollWidth}px`;
+        setTopScrollWidth(table.scrollWidth);
+      }
+    };
+
+    // Initial update
+    updateTopScrollWidth();
+
+    // Update on resize
+    const resizeObserver = new ResizeObserver(updateTopScrollWidth);
+    resizeObserver.observe(table);
+
+    const handleTopScroll = () => {
+      if (bottomScroll) {
+        bottomScroll.scrollLeft = topScroll.scrollLeft;
+      }
+    };
+
+    const handleBottomScroll = () => {
+      if (topScroll) {
+        topScroll.scrollLeft = bottomScroll.scrollLeft;
+      }
+    };
+
+    topScroll.addEventListener('scroll', handleTopScroll);
+    bottomScroll.addEventListener('scroll', handleBottomScroll);
+
+    return () => {
+      topScroll.removeEventListener('scroll', handleTopScroll);
+      bottomScroll.removeEventListener('scroll', handleBottomScroll);
+      resizeObserver.disconnect();
+    };
+  }, []);
+
   return (
-    <div id="data-table" className="overflow-x-auto">
+    <div id="data-table">
       {/* Screen reader announcements for dynamic content */}
       <div aria-live="polite" aria-atomic="true" className="sr-only">
         {data.length} listing{data.length !== 1 ? 's' : ''} in table. {selectedRows.size > 0 ? `${selectedRows.size} selected.` : ''}
@@ -481,32 +644,32 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
         <div className="flex flex-wrap items-center gap-4 flex-1">
           <button
             onClick={handleAdd}
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors shadow-sm select-text"
+            className="inline-flex items-center gap-2 px-4 py-3 sm:py-2 text-base sm:text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors shadow-sm select-text min-h-[44px] sm:min-h-0"
           >
-            <Plus size={16} />
+            <Plus size={18} className="sm:w-4 sm:h-4" />
             Add New Listing
           </button>
 
           <button
             onClick={handleRemoveEmptyRows}
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors shadow-sm select-text"
+            className="inline-flex items-center gap-2 px-4 py-3 sm:py-2 text-base sm:text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors shadow-sm select-text min-h-[44px] sm:min-h-0"
             title="Remove rows with missing required fields (TITLE, PRICE, CONDITION)"
           >
-            <Trash2 size={16} />
+            <Trash2 size={18} className="sm:w-4 sm:h-4" />
             Remove Empty Rows
           </button>
 
           {/* Bulk Actions */}
           {selectedRows.size > 0 && (
             <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-600 dark:text-gray-400 font-medium select-text">
+              <span className="text-mobile-base text-gray-600 dark:text-gray-400 font-medium select-text">
                 {selectedRows.size} selected
               </span>
               <button
                 onClick={handleBulkDelete}
-                className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 transition-colors select-text"
+                className="inline-flex items-center gap-1 btn-mobile-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 transition-colors select-text"
               >
-                <Trash2 size={14} />
+                <Trash2 className="icon-mobile-sm" />
                 Delete
               </button>
               <select
@@ -519,7 +682,7 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
                   }
                   e.target.value = '';
                 }}
-                className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md focus:ring-2 focus:ring-blue-500"
+                className="select-mobile border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">Bulk Edit...</option>
                 <optgroup label="Condition">
@@ -544,7 +707,7 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               aria-label="Search listings by title, description, category, condition, price, or shipping"
-              className="w-full px-4 py-2 pr-10 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+              className="w-full input-mobile pr-10 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
             {searchQuery && (
               <button
@@ -562,9 +725,9 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
           <div className="relative">
             <button
               onClick={() => setShowColumnMenu(!showColumnMenu)}
-              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors select-text"
+              className="inline-flex items-center gap-2 btn-mobile font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors select-text"
             >
-              <Eye size={16} />
+              <Eye className="icon-mobile" />
               Columns
             </button>
 
@@ -586,7 +749,7 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
                           }}
                           className="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
                         />
-                        <span className="text-sm text-gray-700 dark:text-gray-300">{column}</span>
+                        <span className="text-mobile-base text-gray-700 dark:text-gray-300">{column}</span>
                       </label>
                     );
                   })}
@@ -597,7 +760,7 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
 
           {/* Results count */}
           {searchQuery && (
-            <div className={`text-sm font-medium ${
+            <div className={`text-mobile-base font-medium ${
               filteredData.length === 0
                 ? 'text-red-600 dark:text-red-400'
                 : 'text-blue-600 dark:text-blue-400'
@@ -612,7 +775,7 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
 
         {/* Auto-save indicator */}
         {lastSaved && (
-          <div className="flex items-center gap-2 text-sm text-green-600 animate-fade-in">
+          <div className="flex items-center gap-2 text-mobile-base text-green-600 animate-fade-in">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
@@ -621,8 +784,18 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
         )}
       </div>
 
-      <div className="overflow-x-auto">
-        <table ref={tableRef} className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-sm" style={{ tableLayout: 'fixed', width: '100%' }}>
+      {/* Top scrollbar - synced with bottom scrollbar */}
+      <div
+        ref={topScrollRef}
+        className="overflow-x-auto overflow-y-hidden border-b border-gray-300 dark:border-gray-700"
+        style={{ height: '20px' }}
+      >
+        <div style={{ width: topScrollWidth || '100%', height: '1px' }}></div>
+      </div>
+
+      {/* Bottom scrollbar - main table container */}
+      <div ref={bottomScrollRef} className="overflow-x-auto">
+        <table ref={tableRef} className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 table-mobile" style={{ tableLayout: 'fixed', width: '100%' }}>
           <caption className="sr-only">Marketplace listings table with {sortedData.length} items</caption>
           <colgroup>
             <col style={{ width: '50px' }} />
@@ -638,7 +811,7 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
             ))}
             <col style={{ width: '100px' }} />
           </colgroup>
-          <thead className="bg-gray-100 dark:bg-gray-700 sticky top-0 z-10">
+          <thead className="bg-gray-100 dark:bg-gray-700">
             <tr>
               <th className="px-4 py-3 text-left font-medium text-gray-900 dark:text-gray-100 border-b dark:border-gray-600">
                 <input
@@ -790,7 +963,7 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
                   </div>
                 </td>
               </tr>
-            ) : sortedData.map((listing) => (
+            ) : paginatedData.map((listing) => (
               <tr key={listing.id} className="hover:bg-blue-50 dark:hover:bg-gray-700 hover:shadow-md transition-all duration-150">
                 {/* Checkbox */}
                 <td className="px-4 py-2 border-b dark:border-gray-700">
@@ -1159,6 +1332,77 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
         </table>
       </div>
 
+      {/* Pagination Controls */}
+      {totalRows > 0 && (
+        <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-4 px-4 py-3 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
+          {/* Rows per page selector */}
+          <div className="flex items-center gap-2">
+            <label htmlFor="rows-per-page" className="text-sm text-gray-700 dark:text-gray-300">
+              Rows per page:
+            </label>
+            <select
+              id="rows-per-page"
+              value={rowsPerPage}
+              onChange={(e) => {
+                setRowsPerPage(parseInt(e.target.value, 10));
+                setCurrentPage(1);
+              }}
+              className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="10">10</option>
+              <option value="25">25</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+              <option value="250">250</option>
+            </select>
+          </div>
+
+          {/* Page info */}
+          <div className="text-sm text-gray-700 dark:text-gray-300">
+            Showing {startIndex + 1} to {endIndex} of {totalRows} rows
+          </div>
+
+          {/* Page navigation */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setCurrentPage(1)}
+              disabled={currentPage === 1}
+              className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              aria-label="First page"
+            >
+              ««
+            </button>
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              aria-label="Previous page"
+            >
+              «
+            </button>
+            <span className="px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300">
+              Page {currentPage} of {totalPages}
+            </span>
+            <button
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={currentPage === totalPages}
+              className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              aria-label="Next page"
+            >
+              »
+            </button>
+            <button
+              onClick={() => setCurrentPage(totalPages)}
+              disabled={currentPage === totalPages}
+              className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              aria-label="Last page"
+            >
+              »»
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Datalists for autocomplete */}
       <datalist id="title-suggestions">
         {uniqueTitles.map((title, index) => (
@@ -1194,6 +1438,13 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
                   type="number"
                   value={bulkEditModal.value}
                   onChange={(e) => setBulkEditModal({ ...bulkEditModal, value: e.target.value })}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleApplyBulkEdit();
+                    } else if (e.key === 'Escape') {
+                      setBulkEditModal({ show: false, field: null, scope: 'all', value: '' });
+                    }
+                  }}
                   placeholder="Enter price"
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md focus:ring-2 focus:ring-blue-500"
                   autoFocus
@@ -1202,6 +1453,13 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
                 <textarea
                   value={bulkEditModal.value}
                   onChange={(e) => setBulkEditModal({ ...bulkEditModal, value: e.target.value })}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && e.ctrlKey) {
+                      handleApplyBulkEdit();
+                    } else if (e.key === 'Escape') {
+                      setBulkEditModal({ show: false, field: null, scope: 'all', value: '' });
+                    }
+                  }}
                   placeholder={`Enter ${bulkEditModal.field?.toLowerCase()}`}
                   rows={4}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md focus:ring-2 focus:ring-blue-500"
@@ -1212,6 +1470,13 @@ export function DataTable({ data, onUpdate, sortField, sortDirection, onSortChan
                   type="text"
                   value={bulkEditModal.value}
                   onChange={(e) => setBulkEditModal({ ...bulkEditModal, value: e.target.value })}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleApplyBulkEdit();
+                    } else if (e.key === 'Escape') {
+                      setBulkEditModal({ show: false, field: null, scope: 'all', value: '' });
+                    }
+                  }}
                   placeholder={`Enter ${bulkEditModal.field?.toLowerCase()}`}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md focus:ring-2 focus:ring-blue-500"
                   autoFocus
@@ -1328,6 +1593,19 @@ Should show dropdown: ${showPriceDropdown && priceDropdownPosition && uniquePric
         </div>,
         document.body
       )}
+
+      {/* Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        confirmText={confirmDialog.confirmText}
+        cancelText="Cancel"
+        confirmVariant="danger"
+        showDontAskAgain={true}
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+      />
 
     </div>
   );

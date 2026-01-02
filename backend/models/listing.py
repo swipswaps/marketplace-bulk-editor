@@ -16,7 +16,7 @@ class Listing(db.Model):
     
     # Facebook Marketplace fields
     title = db.Column(db.String(150), nullable=False)
-    price = db.Column(db.Numeric(10, 2), nullable=False)
+    price = db.Column(db.Numeric(12, 2), nullable=False)  # Max: 9,999,999,999.99 (9.9 billion)
     condition = db.Column(db.String(50), nullable=False)  # New, Used - Like New, Used - Good, Used - Fair
     description = db.Column(db.Text, nullable=True)
     category = db.Column(db.String(100), nullable=True)

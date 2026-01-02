@@ -1,5 +1,73 @@
 # Development Guide
 
+## Backend Code Changes - IMPORTANT!
+
+### The Problem
+When you edit Python files in `backend/`, Flask's auto-reload detects the change and restarts the server, BUT **Python caches the old module in memory**.
+
+**Symptoms:**
+- You edit `backend/utils/ocr_processor.py`
+- Flask logs show "Detected change, reloading"
+- You test the endpoint
+- **Old code still runs!** (Python cached the old module)
+
+### The Solution
+**Restart the backend container to clear Python's module cache:**
+
+```bash
+docker restart marketplace-backend
+```
+
+**Wait 5-10 seconds for Flask to start, then test again.**
+
+### Why This Happens
+- Flask's auto-reload uses `watchdog` to detect file changes
+- Flask restarts the server process
+- BUT Python's import system caches modules in `sys.modules`
+- The cached module persists across Flask restarts within the same container
+- Only restarting the container clears the cache
+
+### When to Restart vs Rebuild
+
+**Restart (fast - 5 seconds):**
+```bash
+docker restart marketplace-backend
+```
+Use when:
+- ✅ Editing Python files (`.py`)
+- ✅ Changing configuration values in code
+- ✅ Modifying routes, utils, models
+
+**Rebuild (slow - 30+ seconds):**
+```bash
+docker compose down
+docker compose up -d --build backend
+```
+Use when:
+- ✅ Adding dependencies to `requirements.txt`
+- ✅ Changing `Dockerfile`
+- ✅ Changing `docker-compose.yml` environment variables
+
+### Workflow Example
+
+```bash
+# 1. Edit OCR processor
+vim backend/utils/ocr_processor.py
+
+# 2. Restart backend to clear Python cache
+docker restart marketplace-backend
+
+# 3. Wait for Flask to start
+sleep 5
+
+# 4. Test the change
+curl -X POST http://localhost:5000/api/ocr/process \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -F "file=@test.pdf"
+```
+
+---
+
 ## Starting and Stopping the Dev Server
 
 ### ✅ Recommended: Use Scripts

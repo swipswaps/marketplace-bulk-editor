@@ -5,13 +5,19 @@ import { ExportButton } from './components/ExportButton';
 import { BackendStatus } from './components/BackendStatus';
 import { AuthModal } from './components/AuthModal';
 import { UserMenu } from './components/UserMenu';
+import { MobileMenu } from './components/MobileMenu';
+import { UserSettings } from './components/UserSettings';
+import { AdminPanel } from './components/AdminPanel';
 import { SyncStatus } from './components/SyncStatus';
-import { DebugConsole } from './components/DebugConsole';
 import { OCRUpload } from './components/OCRUpload';
 import { ExportTabs } from './components/ExportTabs';
-import { Settings, Download, Upload } from 'lucide-react';
+import { TemplateManager } from './components/TemplateManager';
+import { SaveTemplateModal } from './components/SaveTemplateModal';
+import { SearchImport } from './components/SearchImport';
+import TabNavigation from './components/TabNavigation';
+import HistoryTab from './components/HistoryTab';
+import { Settings, Download, Upload, Search, FileSpreadsheet, Trash2, FolderOpen } from 'lucide-react';
 import type { MarketplaceListing, TemplateMetadata } from './types';
-import { FileSpreadsheet, Trash2 } from 'lucide-react';
 import { useAuth } from './contexts/AuthContext';
 import { useData } from './contexts/DataContext';
 import './utils/consoleCapture'; // Initialize global console capture
@@ -23,7 +29,7 @@ type SortField = keyof MarketplaceListing | null;
 type SortDirection = 'asc' | 'desc' | null;
 
 function App() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user, logout } = useAuth();
   const { listings: dataListings, setListings: setDataListings, saveToDatabase, loadFromDatabase, cleanupDuplicates, isSyncing, debugLogs, clearDebugLogs } = useData();
 
   // Use dataListings directly from context - no need for duplicate local state
@@ -43,9 +49,17 @@ function App() {
   });
   const [showSettings, setShowSettings] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showUserSettings, setShowUserSettings] = useState(false);
+  const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [showOCRUpload, setShowOCRUpload] = useState(false);
+  const [showTemplateManager, setShowTemplateManager] = useState(false);
+  const [showSaveTemplate, setShowSaveTemplate] = useState(false);
+  const [showSearchImport, setShowSearchImport] = useState(false);
   const [exportPreviewContent, setExportPreviewContent] = useState<React.ReactNode | null>(null);
   const [marketplace, setMarketplace] = useState<'facebook' | 'ebay' | 'amazon'>('facebook');
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    return localStorage.getItem('activeTab') || 'editor';
+  });
   const [hasUploadedFile, setHasUploadedFile] = useState(() => {
     return localStorage.getItem('hasUploadedFile') === 'true';
   });
@@ -82,6 +96,11 @@ function App() {
   useEffect(() => {
     localStorage.setItem('showNavControls', JSON.stringify(showNavControls));
   }, [showNavControls]);
+
+  // Save active tab to localStorage
+  useEffect(() => {
+    localStorage.setItem('activeTab', activeTab);
+  }, [activeTab]);
 
   const handleNavControlsToggle = useCallback(() => {
     setShowNavControls(prev => !prev);
@@ -329,51 +348,27 @@ function App() {
       {/* Header */}
       <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-10 transition-colors">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
-          {/* Top Row: Title, Platform, Status, User Controls */}
+          {/* Single Row: Backend Status, Sync Status, User Controls, Hamburger Menu */}
           <div className="flex items-center justify-between gap-4">
-            {/* Left: Logo, Title, and Marketplace Selector */}
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <div className="bg-blue-600 dark:bg-blue-500 p-2 rounded-lg text-white">
-                  <FileSpreadsheet size={20} />
-                </div>
-                <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100 tracking-tight select-text">
-                  Marketplace Bulk Editor
-                </h1>
-              </div>
-
-              {/* Marketplace Selector */}
-              <div className="flex items-center gap-2 border-l border-gray-300 dark:border-gray-600 pl-4">
-                <label htmlFor="marketplace-select" className="text-sm font-medium text-gray-700 dark:text-gray-300 select-text">
-                  Platform:
-                </label>
-                <select
-                  id="marketplace-select"
-                  value={marketplace}
-                  onChange={(e) => setMarketplace(e.target.value as 'facebook' | 'ebay' | 'amazon')}
-                  className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors select-text"
-                  title="Select marketplace platform - different platforms use different databases"
-                >
-                  <option value="facebook">📘 Facebook Marketplace</option>
-                  <option value="ebay">🛒 eBay</option>
-                  <option value="amazon">📦 Amazon</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Center: Backend Status and Sync Status */}
-            <div className="flex-1 max-w-2xl flex items-center gap-4">
+            {/* Left: Backend Status and Sync Status */}
+            <div className="flex items-center gap-4 flex-1">
               <BackendStatus />
               {isAuthenticated && <SyncStatus />}
             </div>
 
-            {/* Right: User Controls */}
+            {/* Right: User Controls and Hamburger Menu */}
             <div className="flex items-center gap-3">
-              {/* User Menu */}
-              <UserMenu onLoginClick={() => setShowAuthModal(true)} />
+              {/* Desktop User Menu - Hidden on mobile */}
+              <div className="hidden md:block">
+                <UserMenu
+                  onLoginClick={() => setShowAuthModal(true)}
+                  onSettingsClick={() => setShowUserSettings(true)}
+                  onAdminClick={() => setShowAdminPanel(true)}
+                />
+              </div>
 
-              {/* Undo/Redo Buttons */}
-              <div className="flex items-center gap-1 border-r border-gray-300 dark:border-gray-600 pr-3">
+              {/* Undo/Redo Buttons - Hidden on mobile */}
+              <div className="hidden md:flex items-center gap-1 border-r border-gray-300 dark:border-gray-600 pr-3">
                 <button
                   onClick={handleUndo}
                   disabled={historyIndex <= 0}
@@ -398,14 +393,32 @@ function App() {
                 </button>
               </div>
 
-              {/* Settings Button */}
+              {/* Hamburger Menu (Settings) - Always visible, moved to upper right */}
               <button
                 onClick={() => setShowSettings(true)}
-                aria-label="Open settings and legal notice"
+                aria-label="Open settings menu"
                 className="p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors select-text"
               >
                 <Settings size={20} aria-hidden="true" />
               </button>
+
+              {/* Mobile Menu - Only on mobile (for user menu functionality) */}
+              <div className="md:hidden">
+                <MobileMenu
+                  isAuthenticated={isAuthenticated}
+                  userEmail={user?.email || null}
+                  onLoginClick={() => setShowAuthModal(true)}
+                  onLogoutClick={logout}
+                  onSettingsClick={() => setShowSettings(true)}
+                  onImportClick={() => {
+                    // Trigger file input click
+                    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+                    fileInput?.click();
+                  }}
+                  onOCRClick={isAuthenticated ? () => setShowOCRUpload(true) : undefined}
+                  showOCR={isAuthenticated}
+                />
+              </div>
             </div>
           </div>
 
@@ -453,16 +466,46 @@ function App() {
               compact={true}
             />
 
+            {/* Search Sites button - icon only with tooltip */}
+            <button
+              onClick={() => setShowSearchImport(true)}
+              aria-label="Search eBay, Facebook Marketplace, Amazon, and custom sites"
+              title="Search Sites - Search eBay, Facebook Marketplace, Amazon, and custom sites"
+              className="p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+            >
+              <Search size={20} />
+            </button>
+
             {/* OCR Upload button - only when authenticated */}
             {isAuthenticated && (
-              <button
-                onClick={() => setShowOCRUpload(true)}
-                aria-label="Upload image for OCR processing"
-                className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors shadow-sm select-text"
-              >
-                <FileSpreadsheet size={16} aria-hidden="true" />
-                OCR
-              </button>
+              <>
+                <button
+                  onClick={() => setShowOCRUpload(true)}
+                  aria-label="Upload image for OCR processing"
+                  className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors shadow-sm select-text"
+                >
+                  <FileSpreadsheet size={16} aria-hidden="true" />
+                  OCR
+                </button>
+                <button
+                  onClick={() => setShowTemplateManager(true)}
+                  aria-label="Manage templates"
+                  className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors shadow-sm select-text"
+                >
+                  <FolderOpen size={16} aria-hidden="true" />
+                  Templates
+                </button>
+                {template && (
+                  <button
+                    onClick={() => setShowSaveTemplate(true)}
+                    aria-label="Save current template configuration"
+                    className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-white bg-teal-600 hover:bg-teal-700 rounded-lg transition-colors shadow-sm select-text"
+                  >
+                    <FileSpreadsheet size={16} aria-hidden="true" />
+                    Save Template
+                  </button>
+                )}
+              </>
             )}
 
             {/* Clear All and Export - only when data exists */}
@@ -471,10 +514,10 @@ function App() {
                 <button
                   onClick={handleClearAll}
                   aria-label={`Clear all ${listings.length} listing(s) - this cannot be undone`}
-                  className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-700 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors shadow-sm select-text"
+                  title={`Clear All - Clear all ${listings.length} listing(s) (cannot be undone)`}
+                  className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
                 >
-                  <Trash2 size={16} aria-hidden="true" />
-                  Clear All
+                  <Trash2 size={20} />
                 </button>
                 <ExportButton
                   data={listings}
@@ -499,6 +542,10 @@ function App() {
             onDarkModeToggle={() => setDarkMode(!darkMode)}
             showNavControls={showNavControls}
             onNavControlsToggle={handleNavControlsToggle}
+            marketplace={marketplace}
+            onMarketplaceChange={setMarketplace}
+            debugLogs={debugLogs}
+            onClearDebugLogs={clearDebugLogs}
           />
         </Suspense>
       )}
@@ -509,9 +556,19 @@ function App() {
         onClose={() => setShowAuthModal(false)}
       />
 
+      {/* User Settings Modal */}
+      {showUserSettings && (
+        <UserSettings onClose={() => setShowUserSettings(false)} />
+      )}
+
+      {/* Admin Panel Modal */}
+      {showAdminPanel && (
+        <AdminPanel onClose={() => setShowAdminPanel(false)} />
+      )}
+
       {/* OCR Upload Modal */}
       {showOCRUpload && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" id="ocr-upload-section">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6">
               <div className="flex items-center justify-between mb-4">
@@ -524,18 +581,107 @@ function App() {
                   ✕
                 </button>
               </div>
-              <OCRUpload />
+              <OCRUpload
+                onViewData={() => {
+                  setShowOCRUpload(false);
+                  setTimeout(() => {
+                    const el = document.getElementById('main-content');
+                    if (el) {
+                      const y = el.getBoundingClientRect().top + window.pageYOffset - 100;
+                      window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
+                    }
+                  }, 100);
+                }}
+              />
             </div>
           </div>
         </div>
       )}
 
+      {/* Template Manager Modal */}
+      {showTemplateManager && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <TemplateManager
+                onTemplateLoad={(template) => {
+                  // Convert backend template to TemplateMetadata format
+                  const templateMetadata: TemplateMetadata = {
+                    sheetName: template.template_data.sheetName || '',
+                    headerRowIndex: 0,
+                    headerRows: template.template_data.headerRows || [],
+                    columnHeaders: template.template_data.columnHeaders || [],
+                    sampleData: template.template_data.sampleData
+                  };
+                  handleTemplateLoad(templateMetadata);
+                  setShowTemplateManager(false);
+                }}
+                onClose={() => setShowTemplateManager(false)}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Search & Import Modal */}
+      {showSearchImport && (
+        <SearchImport
+          onClose={() => setShowSearchImport(false)}
+        />
+      )}
+
+      {/* Save Template Modal */}
+      {showSaveTemplate && template && (
+        <SaveTemplateModal
+          templateData={{
+            sheetName: template.sheetName,
+            headerRows: template.headerRows,
+            columnHeaders: template.columnHeaders,
+            sampleData: template.sampleData
+          }}
+          onClose={() => setShowSaveTemplate(false)}
+          onSaved={() => {
+            setShowSaveTemplate(false);
+            // Optionally refresh template list if manager is open
+          }}
+        />
+      )}
+
       {/* Main Content */}
       <main id="main-content" className="flex-1 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Data Table Section - Show when we have data */}
-          {listings.length > 0 ? (
+          {/* Tab Navigation */}
+          <TabNavigation
+            tabs={[
+              {
+                id: 'editor',
+                label: 'Editor',
+                icon: '✏️',
+                content: (
+                  <>
+                    {/* Data Table Section - Show when we have data */}
+                    {listings.length > 0 ? (
             <div className="space-y-6">
+              {/* Navigation to OCR Upload - only when authenticated */}
+              {isAuthenticated && (
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <FileSpreadsheet size={20} className="text-blue-600 dark:text-blue-400" />
+                      <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                        Extracted Data from OCR
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => setShowOCRUpload(true)}
+                      className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-blue-700 dark:text-blue-300 hover:text-blue-900 dark:hover:text-blue-100 hover:underline"
+                    >
+                      ← Return to OCR Upload
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Show export preview if active, otherwise show DataTable */}
               {exportPreviewContent ? (
                 exportPreviewContent
@@ -581,53 +727,19 @@ function App() {
               Not affiliated with Meta Platforms, Inc. • Facebook® is a registered trademark of Meta Platforms, Inc.
             </p>
           </div>
-
-          {/* Debug Panels */}
-          <div id="debug-logs" className="space-y-4">
-            {/* DataContext Debug Logs (Database operations) */}
-            {debugLogs.length > 0 && (
-              <div className="border border-gray-300 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900">
-                <div className="flex items-center justify-between px-4 py-2 border-b border-gray-300 dark:border-gray-700">
-                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Database Debug Logs</h3>
-                  <button
-                    onClick={clearDebugLogs}
-                    className="text-xs px-2 py-1 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
-                  >
-                    Clear
-                  </button>
-                </div>
-                <div className="p-4 max-h-96 overflow-y-auto font-mono text-xs">
-                  {debugLogs.map((log, idx) => (
-                    <div
-                      key={idx}
-                      className={`mb-2 ${
-                        log.level === 'error' ? 'text-red-600 dark:text-red-400' :
-                        log.level === 'warn' ? 'text-yellow-600 dark:text-yellow-400' :
-                        log.level === 'success' ? 'text-green-600 dark:text-green-400' :
-                        'text-gray-700 dark:text-gray-300'
-                      }`}
-                    >
-                      <span className="text-gray-500 dark:text-gray-500">[{new Date(log.timestamp).toLocaleTimeString()}]</span>
-                      {' '}
-                      <span className="font-semibold">
-                        {log.level === 'error' ? '❌' : log.level === 'warn' ? '⚠️' : log.level === 'success' ? '✅' : '🔵'}
-                      </span>
-                      {' '}
-                      {log.message}
-                      {log.data && (
-                        <pre className="mt-1 ml-4 text-xs text-gray-600 dark:text-gray-400 whitespace-pre-wrap">
-                          {JSON.stringify(log.data, null, 2)}
-                        </pre>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Global Console Output (all console.log/error/warn/info) */}
-            <DebugConsole />
-          </div>
+                  </>
+                ),
+              },
+              {
+                id: 'history',
+                label: 'History',
+                icon: '📋',
+                content: <HistoryTab />,
+              },
+            ]}
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+          />
         </div>
       </main>
     </div>

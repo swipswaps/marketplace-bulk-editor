@@ -1,0 +1,70 @@
+/**
+ * Mobile-First Utility Classes
+ * 
+ * These classes provide mobile-friendly defaults with desktop overrides
+ * Ensures minimum 16px text and 44px touch targets on mobile
+ */
+
+/* Mobile-friendly buttons - 44px minimum touch target */
+.btn-mobile {
+  @apply px-4 py-3 sm:py-2 text-base sm:text-sm min-h-[44px] sm:min-h-0;
+}
+
+.btn-mobile-sm {
+  @apply px-3 py-3 sm:py-1.5 text-base sm:text-sm min-h-[44px] sm:min-h-0;
+}
+
+/* Mobile-friendly inputs - 44px minimum touch target */
+.input-mobile {
+  @apply px-3 py-3 sm:py-2 text-base min-h-[44px] sm:min-h-0;
+}
+
+/* Mobile-friendly select dropdowns */
+.select-mobile {
+  @apply px-3 py-3 sm:py-2 text-base sm:text-sm min-h-[44px] sm:min-h-0;
+}
+
+/* Mobile-friendly text sizes */
+.text-mobile-base {
+  @apply text-base sm:text-sm;
+}
+
+.text-mobile-lg {
+  @apply text-lg sm:text-base;
+}
+
+.text-mobile-xl {
+  @apply text-xl sm:text-lg;
+}
+
+/* Mobile-friendly icons */
+.icon-mobile {
+  @apply w-5 h-5 sm:w-4 sm:h-4;
+}
+
+.icon-mobile-sm {
+  @apply w-4 h-4 sm:w-3.5 sm:h-3.5;
+}
+
+/* Mobile-friendly table text */
+.table-mobile {
+  @apply text-sm md:text-base;
+}
+
+/* Mobile-friendly spacing */
+.gap-mobile {
+  @apply gap-3 sm:gap-2;
+}
+
+.p-mobile {
+  @apply p-4 sm:p-6;
+}
+
+.px-mobile {
+  @apply px-4 sm:px-6;
+}
+
+.py-mobile {
+  @apply py-4 sm:py-6;
+}
+

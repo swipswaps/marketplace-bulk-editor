@@ -1,7 +1,21 @@
-import React, { useState, useEffect } from 'react';
-import { X, Moon, Sun, Shield, Scale, FileWarning, ExternalLink, AlertTriangle, Settings, BookOpen, Info, Github, Loader2, Database, Navigation } from 'lucide-react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import React, { useState } from 'react';
+import { Moon, Sun, Shield, Scale, FileWarning, ExternalLink, AlertTriangle, Settings, BookOpen, Info, Github, Database, Navigation, Terminal } from 'lucide-react';
+import { Modal } from './Modal';
+import { AuditLogsViewer } from './AuditLogsViewer';
+import { useAuth } from '../contexts/AuthContext';
+import { CollapsibleMarkdown } from './CollapsibleMarkdown';
+import { KeyboardShortcutsReference } from './KeyboardShortcutsReference';
+import { BackupManager } from './BackupManager';
+import { DebugConsole } from './DebugConsole';
+import backendDocsMarkdown from '../../docs/HOW_TO_USE_DOCKER_BACKEND.md?raw';
+import userGuideMarkdown from '../../docs/USER_GUIDE.md?raw';
+
+interface DebugLog {
+  timestamp: string;
+  level: 'info' | 'warn' | 'error' | 'success';
+  message: string;
+  data?: unknown;
+}
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -10,6 +24,10 @@ interface SettingsModalProps {
   onDarkModeToggle: () => void;
   showNavControls: boolean;
   onNavControlsToggle: () => void;
+  marketplace: 'facebook' | 'ebay' | 'amazon';
+  onMarketplaceChange: (marketplace: 'facebook' | 'ebay' | 'amazon') => void;
+  debugLogs: DebugLog[];
+  onClearDebugLogs: () => void;
 }
 
 type TabType = 'settings' | 'help' | 'backend' | 'about';
@@ -21,158 +39,89 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onDarkModeToggle,
   showNavControls,
   onNavControlsToggle,
+  marketplace,
+  onMarketplaceChange,
+  debugLogs,
+  onClearDebugLogs,
 }) => {
+  const { isAuthenticated } = useAuth();
   const [activeTab, setActiveTab] = useState<TabType>('settings');
+  const [showAuditLogs, setShowAuditLogs] = useState(false);
   const [hasAcceptedTerms, setHasAcceptedTerms] = useState(() => {
     return localStorage.getItem('termsAccepted') === 'true';
   });
-  // Use status enum pattern to avoid sync setState in useEffect
-  const [readmeStatus, setReadmeStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
-  const [readmeContent, setReadmeContent] = useState<string>('');
-  const [readmeError, setReadmeError] = useState<string | null>(null);
-  const [backendDocsStatus, setBackendDocsStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
-  const [backendDocsContent, setBackendDocsContent] = useState<string>('');
-  const [backendDocsError, setBackendDocsError] = useState<string | null>(null);
 
-  // Derived state for loading indicators
-  const readmeLoading = readmeStatus === 'loading';
-  const backendDocsLoading = backendDocsStatus === 'loading';
+  // Content is now loaded from local files at build time
+  const userGuideContent = userGuideMarkdown;  // Practical "how to use" guide
+  const backendDocsContent = backendDocsMarkdown;  // Docker backend setup
 
   const handleAcceptTerms = (accepted: boolean) => {
     setHasAcceptedTerms(accepted);
     localStorage.setItem('termsAccepted', String(accepted));
   };
 
-  // Fetch README from GitHub when Help tab is opened
-  // Use startTransition to avoid synchronous setState warning in effect
-  useEffect(() => {
-    if (activeTab !== 'help' || readmeStatus !== 'idle') return;
+  // Content is now loaded from local files at build time - no fetching needed
 
-    const controller = new AbortController();
-
-    // Use microtask to defer the setState call
-    queueMicrotask(() => {
-      if (controller.signal.aborted) return;
-      setReadmeStatus('loading');
-
-      fetch('https://raw.githubusercontent.com/swipswaps/marketplace-bulk-editor/main/README.md', {
-        signal: controller.signal
-      })
-        .then(response => {
-          if (!response.ok) {
-            throw new Error('Failed to fetch README');
-          }
-          return response.text();
-        })
-        .then(text => {
-          if (!controller.signal.aborted) {
-            setReadmeContent(text);
-            setReadmeStatus('success');
-          }
-        })
-        .catch(error => {
-          if (!controller.signal.aborted && error.name !== 'AbortError') {
-            console.error('Error fetching README:', error);
-            setReadmeError('Failed to load documentation. Please visit the GitHub repository.');
-            setReadmeStatus('error');
-          }
-        });
-    });
-
-    return () => { controller.abort(); };
-  }, [activeTab, readmeStatus]);
-
-  // Fetch Backend Documentation when Backend tab is opened
-  useEffect(() => {
-    if (activeTab !== 'backend' || backendDocsStatus !== 'idle') return;
-
-    const controller = new AbortController();
-
-    queueMicrotask(() => {
-      if (controller.signal.aborted) return;
-      setBackendDocsStatus('loading');
-
-      fetch('https://raw.githubusercontent.com/swipswaps/marketplace-bulk-editor/main/HOW_TO_USE_DOCKER_BACKEND.md', {
-        signal: controller.signal
-      })
-        .then(response => {
-          if (!response.ok) {
-            throw new Error('Failed to fetch backend documentation');
-          }
-          return response.text();
-        })
-        .then(text => {
-          if (!controller.signal.aborted) {
-            setBackendDocsContent(text);
-            setBackendDocsStatus('success');
-          }
-        })
-        .catch(error => {
-          if (!controller.signal.aborted && error.name !== 'AbortError') {
-            console.error('Error fetching backend docs:', error);
-            setBackendDocsError('Failed to load backend documentation. Please visit the GitHub repository.');
-            setBackendDocsStatus('error');
-          }
-        });
-    });
-
-    return () => { controller.abort(); };
-  }, [activeTab, backendDocsStatus]);
-
-  if (!isOpen) return null;
+  // Mobile-friendly footer with larger touch target
+  const footer = (
+    <button
+      onClick={onClose}
+      className="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 sm:py-2 rounded-lg font-medium transition-colors min-h-[44px] sm:min-h-0 text-base sm:text-sm"
+    >
+      Close
+    </button>
+  );
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Settings & Information</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-          >
-            <X size={24} />
-          </button>
-        </div>
-
-        {/* Tabs */}
-        <div className="flex border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
+    <>
+      <Modal
+        isOpen={isOpen}
+        onClose={onClose}
+        title="Settings & Information"
+        size="xl"
+        footer={footer}
+      >
+        {/* Tabs - Mobile responsive with horizontal scroll */}
+        <div className="flex overflow-x-auto border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 -mx-4 sm:-mx-6 -mt-4 sm:-mt-6 mb-6">
           <button
             onClick={() => setActiveTab('settings')}
-            className={`flex items-center gap-2 px-6 py-3 font-medium transition-colors ${
+            className={`flex items-center gap-2 px-4 sm:px-6 py-3 sm:py-3 font-medium transition-colors whitespace-nowrap min-h-[44px] text-sm sm:text-base ${
               activeTab === 'settings'
                 ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400 bg-white dark:bg-gray-800'
                 : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
             }`}
           >
             <Settings size={18} />
-            Settings & Legal
+            <span className="hidden sm:inline">Settings & Legal</span>
+            <span className="sm:hidden">Settings</span>
           </button>
           <button
             onClick={() => setActiveTab('help')}
-            className={`flex items-center gap-2 px-6 py-3 font-medium transition-colors ${
+            className={`flex items-center gap-2 px-4 sm:px-6 py-3 sm:py-3 font-medium transition-colors whitespace-nowrap min-h-[44px] text-sm sm:text-base ${
               activeTab === 'help'
                 ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400 bg-white dark:bg-gray-800'
                 : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
             }`}
           >
             <BookOpen size={18} />
-            Help & Docs
+            <span className="hidden sm:inline">How to Use</span>
+            <span className="sm:hidden">Help</span>
           </button>
           <button
             onClick={() => setActiveTab('backend')}
-            className={`flex items-center gap-2 px-6 py-3 font-medium transition-colors ${
+            className={`flex items-center gap-2 px-4 sm:px-6 py-3 sm:py-3 font-medium transition-colors whitespace-nowrap min-h-[44px] text-sm sm:text-base ${
               activeTab === 'backend'
                 ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400 bg-white dark:bg-gray-800'
                 : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
             }`}
           >
             <Database size={18} />
-            Backend Guide
+            <span className="hidden sm:inline">Backend Guide</span>
+            <span className="sm:hidden">Backend</span>
           </button>
           <button
             onClick={() => setActiveTab('about')}
-            className={`flex items-center gap-2 px-6 py-3 font-medium transition-colors ${
+            className={`flex items-center gap-2 px-4 sm:px-6 py-3 sm:py-3 font-medium transition-colors whitespace-nowrap min-h-[44px] text-sm sm:text-base ${
               activeTab === 'about'
                 ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400 bg-white dark:bg-gray-800'
                 : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
@@ -184,7 +133,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <div className="space-y-6">
           {/* Settings Tab */}
           {activeTab === 'settings' && (
             <>
@@ -236,6 +185,121 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   }`}
                 />
               </button>
+            </div>
+
+            {/* Platform Selector */}
+            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <label htmlFor="settings-marketplace-select" className="block text-sm font-medium text-gray-900 dark:text-white mb-2">
+                Platform
+              </label>
+              <select
+                id="settings-marketplace-select"
+                value={marketplace}
+                onChange={(e) => onMarketplaceChange(e.target.value as 'facebook' | 'ebay' | 'amazon')}
+                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                title="Select marketplace platform - different platforms use different databases"
+              >
+                <option value="facebook">📘 Facebook Marketplace</option>
+                <option value="ebay">🛒 eBay</option>
+                <option value="amazon">📦 Amazon</option>
+              </select>
+              <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
+                Different platforms use different databases
+              </p>
+            </div>
+
+            {/* Audit Logs Button (only when authenticated) */}
+            {isAuthenticated && (
+              <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                <button
+                  onClick={() => setShowAuditLogs(true)}
+                  className="w-full flex items-center justify-between p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <Shield size={20} className="text-blue-600 dark:text-blue-400" />
+                    <div className="text-left">
+                      <p className="font-medium text-gray-900 dark:text-white">View Audit Logs</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">See all account activity and security events</p>
+                    </div>
+                  </div>
+                  <ExternalLink size={16} className="text-blue-600 dark:text-blue-400" />
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Database Backup Section (only when authenticated) */}
+          {isAuthenticated && (
+            <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                <Database size={20} />
+                Database Backup & Restore
+              </h3>
+              <BackupManager />
+            </div>
+          )}
+
+          {/* Keyboard Shortcuts Reference */}
+          <KeyboardShortcutsReference />
+
+          {/* Debug Logs Section */}
+          <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+              <Terminal size={20} />
+              Debug Logs
+            </h3>
+
+            {/* Database Debug Logs */}
+            {debugLogs.length > 0 ? (
+              <div className="border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 mb-4">
+                <div className="flex items-center justify-between px-4 py-2 border-b border-gray-300 dark:border-gray-700">
+                  <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Database Operations</h4>
+                  <button
+                    onClick={onClearDebugLogs}
+                    className="text-xs px-2 py-1 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
+                  >
+                    Clear
+                  </button>
+                </div>
+                <div className="p-4 max-h-96 overflow-y-auto font-mono text-xs">
+                  {debugLogs.map((log, idx) => (
+                    <div
+                      key={idx}
+                      className={`mb-2 ${
+                        log.level === 'error' ? 'text-red-600 dark:text-red-400' :
+                        log.level === 'warn' ? 'text-yellow-600 dark:text-yellow-400' :
+                        log.level === 'success' ? 'text-green-600 dark:text-green-400' :
+                        'text-gray-700 dark:text-gray-300'
+                      }`}
+                    >
+                      <span className="text-gray-500 dark:text-gray-500">[{new Date(log.timestamp).toLocaleTimeString()}]</span>
+                      {' '}
+                      <span className="font-semibold">
+                        {log.level === 'error' ? '❌' : log.level === 'warn' ? '⚠️' : log.level === 'success' ? '✅' : '🔵'}
+                      </span>
+                      {' '}
+                      {log.message}
+                      {log.data !== undefined && log.data !== null && (
+                        <pre className="mt-1 ml-4 text-xs text-gray-600 dark:text-gray-400 whitespace-pre-wrap">
+                          {typeof log.data === 'object' ? JSON.stringify(log.data, null, 2) : String(log.data)}
+                        </pre>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">No database debug logs yet</p>
+            )}
+
+            {/* Global Console Output */}
+            <div className="border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800">
+              <div className="px-4 py-2 border-b border-gray-300 dark:border-gray-700">
+                <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Console Output</h4>
+              </div>
+              <div className="p-4">
+                <DebugConsole />
+              </div>
             </div>
           </div>
 
@@ -336,130 +400,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </>
           )}
 
-          {/* Help Tab */}
+          {/* Help Tab - User Guide */}
           {activeTab === 'help' && (
             <div className="space-y-4">
-              {readmeLoading && (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="animate-spin text-blue-600 dark:text-blue-400" size={32} />
-                  <span className="ml-3 text-gray-600 dark:text-gray-400">Loading documentation...</span>
-                </div>
-              )}
-
-              {readmeError && (
-                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-                  <p className="text-sm text-red-800 dark:text-red-300 mb-2">{readmeError}</p>
-                  <a
-                    href="https://github.com/swipswaps/marketplace-bulk-editor#readme"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 hover:underline"
-                  >
-                    View on GitHub <ExternalLink size={14} />
-                  </a>
-                </div>
-              )}
-
-              {readmeContent && !readmeLoading && (
-                <div className="prose prose-sm dark:prose-invert max-w-none
-                  prose-headings:font-bold
-                  prose-h1:text-3xl prose-h1:mb-4 prose-h1:mt-6
-                  prose-h2:text-2xl prose-h2:mb-3 prose-h2:mt-5 prose-h2:border-b prose-h2:border-gray-200 dark:prose-h2:border-gray-700 prose-h2:pb-2
-                  prose-h3:text-xl prose-h3:mb-2 prose-h3:mt-4
-                  prose-h4:text-lg prose-h4:mb-2 prose-h4:mt-3
-                  prose-p:leading-relaxed prose-p:mb-4
-                  prose-a:text-blue-600 dark:prose-a:text-blue-400 prose-a:no-underline hover:prose-a:underline
-                  prose-strong:font-semibold
-                  prose-code:text-sm prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:bg-gray-100 dark:prose-code:bg-gray-800 prose-code:text-pink-600 dark:prose-code:text-pink-400 prose-code:before:content-none prose-code:after:content-none
-                  prose-pre:bg-gray-100 dark:prose-pre:bg-gray-800 prose-pre:border prose-pre:border-gray-200 dark:prose-pre:border-gray-700 prose-pre:rounded-lg prose-pre:p-4
-                  prose-ul:my-4 prose-ul:list-disc prose-ul:pl-6
-                  prose-ol:my-4 prose-ol:list-decimal prose-ol:pl-6
-                  prose-li:my-1
-                  prose-blockquote:border-l-4 prose-blockquote:border-gray-300 dark:prose-blockquote:border-gray-600 prose-blockquote:pl-4 prose-blockquote:italic
-                  prose-hr:border-gray-200 dark:prose-hr:border-gray-700 prose-hr:my-8
-                  prose-table:border-collapse prose-table:w-full
-                  prose-th:border prose-th:border-gray-300 dark:prose-th:border-gray-600 prose-th:bg-gray-100 dark:prose-th:bg-gray-800 prose-th:px-4 prose-th:py-2 prose-th:text-left
-                  prose-td:border prose-td:border-gray-300 dark:prose-td:border-gray-600 prose-td:px-4 prose-td:py-2
-                  prose-img:rounded-lg prose-img:shadow-md
-                ">
-                  <ReactMarkdown
-                    remarkPlugins={[remarkGfm]}
-                    components={{
-                      a: ({ ...props }) => (
-                        <a {...props} target="_blank" rel="noopener noreferrer" />
-                      ),
-                    }}
-                  >
-                    {readmeContent}
-                  </ReactMarkdown>
-                </div>
-              )}
+              <CollapsibleMarkdown content={userGuideContent} showTableOfContents={true} />
             </div>
           )}
 
-          {/* Backend Guide Tab */}
+          {/* Backend Guide Tab - Docker Setup */}
           {activeTab === 'backend' && (
             <div className="space-y-4">
-              {backendDocsLoading && (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="animate-spin text-blue-600 dark:text-blue-400" size={32} />
-                  <span className="ml-3 text-gray-600 dark:text-gray-400">Loading backend documentation...</span>
-                </div>
-              )}
-
-              {backendDocsError && (
-                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-                  <div className="flex items-start gap-3">
-                    <AlertTriangle className="text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" size={20} />
-                    <div className="flex-1">
-                      <p className="text-sm text-red-800 dark:text-red-200 mb-2">{backendDocsError}</p>
-                      <a
-                        href="https://github.com/swipswaps/marketplace-bulk-editor/blob/main/HOW_TO_USE_DOCKER_BACKEND.md"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-sm text-red-700 dark:text-red-300 hover:underline"
-                      >
-                        View on GitHub <ExternalLink size={14} />
-                      </a>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {backendDocsContent && !backendDocsLoading && (
-                <div className="prose prose-sm dark:prose-invert max-w-none
-                  prose-headings:font-bold
-                  prose-h1:text-3xl prose-h1:mb-4 prose-h1:mt-6
-                  prose-h2:text-2xl prose-h2:mb-3 prose-h2:mt-5 prose-h2:border-b prose-h2:border-gray-200 dark:prose-h2:border-gray-700 prose-h2:pb-2
-                  prose-h3:text-xl prose-h3:mb-2 prose-h3:mt-4
-                  prose-h4:text-lg prose-h4:mb-2 prose-h4:mt-3
-                  prose-p:leading-relaxed prose-p:mb-4
-                  prose-a:text-blue-600 dark:prose-a:text-blue-400 prose-a:no-underline hover:prose-a:underline
-                  prose-strong:font-semibold
-                  prose-code:text-sm prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:bg-gray-100 dark:prose-code:bg-gray-800 prose-code:text-pink-600 dark:prose-code:text-pink-400 prose-code:before:content-none prose-code:after:content-none
-                  prose-pre:bg-gray-100 dark:prose-pre:bg-gray-800 prose-pre:border prose-pre:border-gray-200 dark:prose-pre:border-gray-700 prose-pre:rounded-lg prose-pre:p-4
-                  prose-ul:my-4 prose-ul:list-disc prose-ul:pl-6
-                  prose-ol:my-4 prose-ol:list-decimal prose-ol:pl-6
-                  prose-li:my-1
-                  prose-blockquote:border-l-4 prose-blockquote:border-gray-300 dark:prose-blockquote:border-gray-600 prose-blockquote:pl-4 prose-blockquote:italic
-                  prose-hr:border-gray-200 dark:prose-hr:border-gray-700 prose-hr:my-8
-                  prose-table:border-collapse prose-table:w-full
-                  prose-th:border prose-th:border-gray-300 dark:prose-th:border-gray-600 prose-th:bg-gray-100 dark:prose-th:bg-gray-800 prose-th:px-4 prose-th:py-2 prose-th:text-left
-                  prose-td:border prose-td:border-gray-300 dark:prose-td:border-gray-600 prose-td:px-4 prose-td:py-2
-                  prose-img:rounded-lg prose-img:shadow-md
-                ">
-                  <ReactMarkdown
-                    remarkPlugins={[remarkGfm]}
-                    components={{
-                      a: ({ ...props }) => (
-                        <a {...props} target="_blank" rel="noopener noreferrer" />
-                      ),
-                    }}
-                  >
-                    {backendDocsContent}
-                  </ReactMarkdown>
-                </div>
-              )}
+              <CollapsibleMarkdown content={backendDocsContent} showTableOfContents={true} />
             </div>
           )}
 
@@ -573,18 +524,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           )}
         </div>
+      </Modal>
 
-        {/* Footer */}
-        <div className="border-t border-gray-200 dark:border-gray-700 p-6">
-          <button
-            onClick={onClose}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
-          >
-            Close
-          </button>
-        </div>
-      </div>
-    </div>
+      {/* Audit Logs Modal - Nested modal with higher z-index */}
+      {showAuditLogs && (
+        <AuditLogsViewer onClose={() => setShowAuditLogs(false)} />
+      )}
+    </>
   );
 };
 

@@ -25,9 +25,14 @@ A professional-grade web application for editing and combining Facebook Marketpl
 # Start all services (PostgreSQL, Redis, Backend, Frontend)
 ./docker-start.sh
 
+# OPTIONAL: Start scraper backend (for eBay/Amazon/Facebook/Salvex search)
+cd backend-scraper
+./start.sh
+
 # Access the app
 # Frontend: http://localhost:5173
 # Backend API: http://localhost:5000
+# Scraper API: http://localhost:5001 (if started)
 
 # Stop all services
 ./docker-stop.sh
@@ -187,6 +192,7 @@ For complete terms, see the [LICENSE](LICENSE) file.
 
 ### Core Features
 - 📤 **Multi-File Upload**: Drag & drop or select multiple Excel files (.xlsx, .xls, .csv)
+- 🔍 **Search & Import**: Search eBay, Facebook Marketplace, Amazon, Salvex and import listings directly
 - ✏️ **Inline Editing**: Click any cell to edit directly without separate edit mode
 - 🔄 **Combine Spreadsheets**: Merge multiple files into one unified list
 - 📱 **Mobile Responsive**: Works seamlessly on desktop, tablet, and mobile devices
@@ -246,6 +252,43 @@ For complete terms, see the [LICENSE](LICENSE) file.
 - ⚠️ **Empty Titles**: Warns if any listings have blank titles
 - ⚠️ **Invalid Prices**: Warns if prices are missing or ≤ 0
 - ⚠️ **Empty Descriptions**: Warns if descriptions are blank
+
+### Search & Import from Sites
+
+**NEW: Search eBay, Facebook Marketplace, Amazon, and custom sites directly!**
+
+**Prerequisites:**
+- Scraper backend must be running (see [backend-scraper/README.md](backend-scraper/README.md))
+
+**How to use (2-step process):**
+1. Click **"Search Sites"** button in the header (green button)
+2. Enter **search keywords** (e.g., "solar panels")
+3. **Check the sites** you want to search:
+   - ☑️ eBay
+   - ☑️ Amazon
+   - ☑️ Facebook Marketplace
+   - ☑️ Your custom sites (optional)
+4. Click **"Search Selected Sites"**
+5. Wait for scraping to complete (shows progress per site)
+6. Scraped listings are automatically imported into the editor
+
+**Add custom sites:**
+- Click **"+ Add Custom Site"** in the modal
+- Enter site name and URL template
+- Use `{keywords}` as placeholder in URL
+- Example: `https://example.com/search?q={keywords}`
+- Custom sites are saved to your browser
+
+**Features:**
+- ✅ Keyword-based search (no manual URL copying)
+- ✅ Multi-site search (check multiple sites at once)
+- ✅ Sequential scraping with per-site progress
+- ✅ Custom site support (add any site you want)
+- ✅ Rate limiting prevents IP blocking
+- ✅ Retry logic handles network failures
+- ✅ Results in Facebook Marketplace format
+
+**Note**: The scraper backend runs separately on port 5001. See [backend-scraper/README.md](backend-scraper/README.md) for setup instructions.
 
 ### Editing Listings
 

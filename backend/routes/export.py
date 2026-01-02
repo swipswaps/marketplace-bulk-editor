@@ -235,7 +235,7 @@ def export_sql(current_user):
     output.write("CREATE TABLE IF NOT EXISTS marketplace_listings (\n")
     output.write("    id VARCHAR(36) PRIMARY KEY,\n")
     output.write("    title VARCHAR(150) NOT NULL,\n")
-    output.write("    price DECIMAL(10, 2) NOT NULL,\n")
+    output.write("    price DECIMAL(12, 2) NOT NULL,\n")
     output.write("    condition VARCHAR(50) NOT NULL,\n")
     output.write("    description TEXT,\n")
     output.write("    category VARCHAR(100),\n")

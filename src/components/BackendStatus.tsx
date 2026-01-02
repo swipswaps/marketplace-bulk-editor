@@ -138,7 +138,7 @@ export function BackendStatus({ className = '' }: BackendStatusProps) {
       <div className={`border rounded-lg p-3 ${getStatusColor()}`}>
         <button
           onClick={() => setIsExpanded(!isExpanded)}
-          className="w-full flex items-center justify-between gap-2 select-text"
+          className="btn-mobile w-full flex items-center justify-between gap-2 select-text"
           aria-label={`Backend status: ${health.message}. Click to ${isExpanded ? 'collapse' : 'expand'} details.`}
           aria-expanded={isExpanded}
           aria-controls="backend-status-details"

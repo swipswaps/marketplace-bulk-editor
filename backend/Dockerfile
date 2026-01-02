@@ -1,6 +1,6 @@
 FROM python:3.11-slim
 
-# Install system dependencies
+# Install system dependencies including Node.js
 RUN apt-get update && apt-get install -y \
     tesseract-ocr \
     tesseract-ocr-eng \
@@ -14,6 +14,9 @@ RUN apt-get update && apt-get install -y \
     libxext6 \
     libxrender1 \
     libgomp1 \
+    curl \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
@@ -24,6 +27,10 @@ COPY requirements.txt .
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
+
+# Pre-download PaddleOCR models to avoid runtime delays
+# This downloads the English OCR models (~100MB) during build
+RUN python3 -c "from paddleocr import PaddleOCR; ocr = PaddleOCR(use_textline_orientation=True, lang='en'); print('PaddleOCR models downloaded successfully')"
 
 # Copy application code
 COPY . .

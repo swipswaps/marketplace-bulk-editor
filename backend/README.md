@@ -170,9 +170,10 @@ docker run -p 5000:5000 \
 
 ---
 
-## API Endpoints (28 Total)
+## API Endpoints (37 Total)
 
-**✅ VERIFIED**: All endpoints tested and confirmed working (2025-12-19)
+**✅ VERIFIED**: Core endpoints tested and confirmed working (2025-12-19)
+**🆕 NEW**: Analytics and Audit endpoints added (2025-12-27)
 
 ### Root Endpoint
 - `GET /` - API information and endpoint list
@@ -243,6 +244,35 @@ docker run -p 5000:5000 \
 - `POST /api/export/json` - Export as JSON
 - `POST /api/export/sql` - Export as SQL INSERT statements
 - **Rate limit**: 50 exports/hour
+
+### Admin (2 endpoints)
+- `POST /api/admin/cleanup/duplicates` - Remove duplicate listings
+  - Keeps most recently updated version
+  - Identifies duplicates by user_id + title (case-insensitive)
+- `GET /api/admin/stats` - Get user's listing statistics
+  - Returns: total, duplicates, unique titles
+
+### Analytics (4 endpoints) 🆕
+- `GET /api/analytics/summary` - Get summary statistics
+  - Returns: total_listings, average_price, total_value, price_range
+  - Includes: condition_counts, category_counts, shipping_counts
+- `GET /api/analytics/price-distribution` - Get price distribution for histogram
+  - Query params: `bins` (default: 10)
+  - Returns: bins with min/max/count/percentage, statistics (mean, median)
+- `GET /api/analytics/time-series` - Get listings created over time
+  - Query params: `period` (day/week/month), `days` (default: 30)
+  - Returns: Array of {date, count, total_value}
+- `GET /api/analytics/trends` - Get trend analysis
+  - Returns: top_categories, top_conditions, recent_activity
+
+### Audit (3 endpoints) 🆕
+- `GET /api/audit/logs` - Get audit logs (paginated)
+  - Query params: `page`, `per_page`, `action`, `date_from`, `date_to`, `resource_type`
+  - Returns: logs array with pagination metadata
+- `GET /api/audit/logs/actions` - Get list of unique action types
+  - Returns: Array of action names
+- `GET /api/audit/logs/stats` - Get audit log statistics
+  - Returns: total_logs, action_counts, recent_activity (last 24h)
 
 ---
 
