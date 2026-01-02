@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Moon, Sun, Shield, Scale, FileWarning, ExternalLink, AlertTriangle, Settings, BookOpen, Info, Github, Database, Navigation, Terminal } from 'lucide-react';
+import { Moon, Sun, Shield, Scale, FileWarning, ExternalLink, AlertTriangle, Settings, BookOpen, Info, Github, Database, Terminal } from 'lucide-react';
 import { Modal } from './Modal';
 import { AuditLogsViewer } from './AuditLogsViewer';
 import { useAuth } from '../contexts/AuthContext';
@@ -22,8 +22,6 @@ interface SettingsModalProps {
   onClose: () => void;
   darkMode: boolean;
   onDarkModeToggle: () => void;
-  showNavControls: boolean;
-  onNavControlsToggle: () => void;
   marketplace: 'facebook' | 'ebay' | 'amazon';
   onMarketplaceChange: (marketplace: 'facebook' | 'ebay' | 'amazon') => void;
   debugLogs: DebugLog[];
@@ -37,8 +35,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onClose,
   darkMode,
   onDarkModeToggle,
-  showNavControls,
-  onNavControlsToggle,
   marketplace,
   onMarketplaceChange,
   debugLogs,
@@ -159,29 +155,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <span
                   className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
                     darkMode ? 'translate-x-6' : 'translate-x-1'
-                  }`}
-                />
-              </button>
-            </div>
-
-            {/* Navigation Controls Toggle */}
-            <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-              <div className="flex items-center gap-3">
-                <Navigation size={20} className="text-gray-700 dark:text-gray-300" />
-                <div>
-                  <p className="font-medium text-gray-900 dark:text-white">Navigation Controls</p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Show floating navigation panel</p>
-                </div>
-              </div>
-              <button
-                onClick={onNavControlsToggle}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  showNavControls ? 'bg-blue-600' : 'bg-gray-300'
-                }`}
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    showNavControls ? 'translate-x-6' : 'translate-x-1'
                   }`}
                 />
               </button>

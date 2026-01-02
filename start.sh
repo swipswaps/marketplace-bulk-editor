@@ -40,6 +40,17 @@ sleep 1
 
 # Kill any process on ports 5173 and 5174 to ensure clean start
 for PORT in 5173 5174; do
+    # First check if Docker container is using this port
+    DOCKER_CONTAINER=$(docker ps --format '{{.Names}}' --filter "publish=$PORT" 2>/dev/null | head -1)
+    if [ -n "$DOCKER_CONTAINER" ]; then
+        echo "   ⚠️  Docker container '$DOCKER_CONTAINER' is using port $PORT"
+        echo "   Stopping Docker container..."
+        docker stop "$DOCKER_CONTAINER" >/dev/null 2>&1
+        echo "   ✅ Docker container stopped"
+        sleep 1
+    fi
+
+    # Then check for host processes on this port
     PORT_PID=$(lsof -ti:$PORT 2>/dev/null)
     if [ -n "$PORT_PID" ]; then
         echo "   Killing process on port $PORT (PID: $PORT_PID)..."

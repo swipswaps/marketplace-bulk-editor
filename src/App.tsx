@@ -63,11 +63,6 @@ function App() {
   const [hasUploadedFile, setHasUploadedFile] = useState(() => {
     return localStorage.getItem('hasUploadedFile') === 'true';
   });
-  // Navigation controls visibility - disabled by default, persisted to localStorage
-  const [showNavControls, setShowNavControls] = useState<boolean>(() => {
-    const saved = localStorage.getItem('showNavControls');
-    return saved ? JSON.parse(saved) : false;
-  });
 
   // Undo/Redo state
   const [history, setHistory] = useState<MarketplaceListing[][]>([]);
@@ -92,19 +87,10 @@ function App() {
     }
   }, [template]);
 
-  // Save navigation controls visibility to localStorage
-  useEffect(() => {
-    localStorage.setItem('showNavControls', JSON.stringify(showNavControls));
-  }, [showNavControls]);
-
   // Save active tab to localStorage
   useEffect(() => {
     localStorage.setItem('activeTab', activeTab);
   }, [activeTab]);
-
-  const handleNavControlsToggle = useCallback(() => {
-    setShowNavControls(prev => !prev);
-  }, []);
 
   const handleTemplateLoad = useCallback((newTemplate: TemplateMetadata, isPreload = false) => {
     setTemplate(newTemplate);
@@ -269,74 +255,6 @@ function App() {
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-900 transition-colors">
-      {/* Navigation Controls - Hidden by default, toggleable from Settings */}
-      {showNavControls && (
-        <div className="fixed top-2 right-2 z-50 flex flex-col gap-2 bg-white dark:bg-gray-800 border-2 border-blue-500 rounded-lg p-3 shadow-lg">
-          <div className="flex items-center justify-between mb-1">
-            <div className="text-xs font-bold text-blue-600 dark:text-blue-400">NAVIGATION CONTROLS</div>
-            <button
-              onClick={() => setShowNavControls(false)}
-              className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
-              aria-label="Close navigation controls"
-              title="Close (enable in Settings)"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="18" y1="6" x2="6" y2="18"></line>
-                <line x1="6" y1="6" x2="18" y2="18"></line>
-              </svg>
-            </button>
-          </div>
-          <button
-            onClick={() => {
-              const el = document.getElementById('main-content');
-              if (el) {
-                const y = el.getBoundingClientRect().top + window.pageYOffset - 300;
-                window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
-              }
-            }}
-            className="px-3 py-2 text-sm font-medium bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-center"
-          >
-            Jump to Main Content
-          </button>
-          <button
-            onClick={() => {
-              const el = document.getElementById('data-table');
-              if (el) {
-                const y = el.getBoundingClientRect().top + window.pageYOffset - 300;
-                window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
-              }
-            }}
-            className="px-3 py-2 text-sm font-medium bg-green-600 text-white rounded hover:bg-green-700 transition-colors text-center"
-          >
-            Jump to Data Table
-          </button>
-          <button
-            onClick={() => {
-              const el = document.getElementById('analytics');
-              if (el) {
-                const y = el.getBoundingClientRect().top + window.pageYOffset - 300;
-                window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
-              }
-            }}
-            className="px-3 py-2 text-sm font-medium bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors text-center"
-          >
-            Jump to Analytics
-          </button>
-          <button
-            onClick={() => {
-              const el = document.getElementById('debug-logs');
-              if (el) {
-                const y = el.getBoundingClientRect().top + window.pageYOffset - 300;
-                window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
-              }
-            }}
-            className="px-3 py-2 text-sm font-medium bg-orange-600 text-white rounded hover:bg-orange-700 transition-colors text-center"
-          >
-            Jump to Debug Logs
-          </button>
-        </div>
-      )}
-
       {/* Skip to main content link for keyboard users */}
       <a
         href="#main-content"
@@ -540,8 +458,6 @@ function App() {
             onClose={() => setShowSettings(false)}
             darkMode={darkMode}
             onDarkModeToggle={() => setDarkMode(!darkMode)}
-            showNavControls={showNavControls}
-            onNavControlsToggle={handleNavControlsToggle}
             marketplace={marketplace}
             onMarketplaceChange={setMarketplace}
             debugLogs={debugLogs}
