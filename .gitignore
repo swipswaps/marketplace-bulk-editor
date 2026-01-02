@@ -43,5 +43,5 @@ test_output.txt
 # Organized directories (local only)
 screenshots/
 tests/
-docs/
+# docs/ - REMOVED: needed for SettingsModal.tsx import
 .archive/
