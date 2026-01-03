@@ -4,11 +4,16 @@
  */
 
 import { useState } from 'react';
-import { X, Image as ImageIcon, FileText, Download, CheckCircle, Edit3 } from 'lucide-react';
+import { X, Image as ImageIcon, FileText, Download, CheckCircle, Edit3, Plus, RefreshCw, ArrowDown } from 'lucide-react';
 import { ImagePreprocessor } from './ImagePreprocessor';
 import { OCRTextEditor } from './OCRTextEditor';
 import { OCRScratchPad } from './OCRScratchPad';
 import type { MarketplaceListing } from '../types';
+
+export interface ImportOptions {
+  mode: 'append' | 'replace' | 'insert';
+  insertAtRow?: number;
+}
 
 interface OCRResultsViewerProps {
   imageUrl: string;
@@ -16,8 +21,9 @@ interface OCRResultsViewerProps {
   confidence: number;
   extractedProducts?: MarketplaceListing[];
   onClose: () => void;
-  onProductsImport?: (products: MarketplaceListing[]) => void;
+  onProductsImport?: (products: MarketplaceListing[], options?: ImportOptions) => void;
   onReprocess?: (processedImageUrl: string) => void;
+  currentRowCount?: number;
 }
 
 type ViewMode = 'image' | 'text' | 'products' | 'scratch';
@@ -29,15 +35,45 @@ export function OCRResultsViewer({
   extractedProducts = [],
   onClose,
   onProductsImport,
-  onReprocess
+  onReprocess,
+  currentRowCount = 0
 }: OCRResultsViewerProps) {
-  const [viewMode, setViewMode] = useState<ViewMode>('products');
+  const [viewMode, setViewMode] = useState<ViewMode>('text');
   const [editedText, setEditedText] = useState(ocrText);
+  const [selectedProducts, setSelectedProducts] = useState<Set<number>>(
+    new Set(extractedProducts.map((_, idx) => idx)) // Select all by default
+  );
+  const [importMode, setImportMode] = useState<'append' | 'replace' | 'insert'>('append');
+  const [insertAtRow, setInsertAtRow] = useState(1);
+
+  const toggleProductSelection = (idx: number) => {
+    setSelectedProducts(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(idx)) {
+        newSet.delete(idx);
+      } else {
+        newSet.add(idx);
+      }
+      return newSet;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedProducts.size === extractedProducts.length) {
+      setSelectedProducts(new Set());
+    } else {
+      setSelectedProducts(new Set(extractedProducts.map((_, idx) => idx)));
+    }
+  };
 
   const handleImportProducts = () => {
-    if (extractedProducts.length > 0 && onProductsImport) {
-      // extractedProducts is already in MarketplaceListing format
-      onProductsImport(extractedProducts);
+    if (selectedProducts.size > 0 && onProductsImport) {
+      const productsToImport = extractedProducts.filter((_, idx) => selectedProducts.has(idx));
+      const options: ImportOptions = {
+        mode: importMode,
+        insertAtRow: importMode === 'insert' ? insertAtRow : undefined
+      };
+      onProductsImport(productsToImport, options);
       onClose();
     }
   };
@@ -133,39 +169,139 @@ export function OCRResultsViewer({
                   </p>
                 </div>
               ) : (
-                <div className="space-y-3">
-                  {extractedProducts.map((product, idx) => (
-                    <div
-                      key={idx}
-                      className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-4"
-                    >
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1">
-                          <h3 className="font-medium text-gray-900 dark:text-white">
-                            {product.TITLE || 'Untitled Product'}
-                          </h3>
-                          {product.DESCRIPTION && (
-                            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                              {product.DESCRIPTION}
-                            </p>
-                          )}
-                          <div className="flex items-center gap-4 mt-2 text-sm">
-                            {product.PRICE && (
-                              <span className="text-green-600 dark:text-green-400 font-medium">
-                                ${typeof product.PRICE === 'number' ? product.PRICE.toFixed(2) : product.PRICE}
-                              </span>
+                <>
+                  {/* Selection and Import Controls */}
+                  <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                          <input
+                            type="checkbox"
+                            checked={selectedProducts.size === extractedProducts.length}
+                            onChange={toggleSelectAll}
+                            className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                          />
+                          Select All ({selectedProducts.size}/{extractedProducts.length})
+                        </label>
+                      </div>
+                    </div>
+
+                    {/* Import Mode Selection */}
+                    <div className="space-y-2">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Import Mode:
+                      </label>
+                      <div className="flex items-center gap-4">
+                        <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                          <input
+                            type="radio"
+                            name="importMode"
+                            value="append"
+                            checked={importMode === 'append'}
+                            onChange={(e) => setImportMode(e.target.value as 'append')}
+                            className="w-4 h-4 text-blue-600 focus:ring-2 focus:ring-blue-500"
+                          />
+                          <Plus size={16} className="inline" />
+                          Append to end
+                        </label>
+                        <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                          <input
+                            type="radio"
+                            name="importMode"
+                            value="replace"
+                            checked={importMode === 'replace'}
+                            onChange={(e) => setImportMode(e.target.value as 'replace')}
+                            className="w-4 h-4 text-blue-600 focus:ring-2 focus:ring-blue-500"
+                          />
+                          <RefreshCw size={16} className="inline" />
+                          Replace all data
+                        </label>
+                        <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                          <input
+                            type="radio"
+                            name="importMode"
+                            value="insert"
+                            checked={importMode === 'insert'}
+                            onChange={(e) => setImportMode(e.target.value as 'insert')}
+                            className="w-4 h-4 text-blue-600 focus:ring-2 focus:ring-blue-500"
+                          />
+                          <ArrowDown size={16} className="inline" />
+                          Insert at row
+                        </label>
+                        {importMode === 'insert' && (
+                          <input
+                            type="number"
+                            min="1"
+                            max={currentRowCount + 1}
+                            value={insertAtRow}
+                            onChange={(e) => setInsertAtRow(Math.max(1, parseInt(e.target.value) || 1))}
+                            className="w-20 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                          />
+                        )}
+                      </div>
+                      {importMode === 'replace' && (
+                        <p className="text-xs text-orange-600 dark:text-orange-400">
+                          ⚠️ This will delete all existing data and replace with selected products
+                        </p>
+                      )}
+                      {importMode === 'insert' && (
+                        <p className="text-xs text-gray-600 dark:text-gray-400">
+                          Selected products will be inserted at row {insertAtRow} (current rows: {currentRowCount})
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Products List with Checkboxes */}
+                  <div className="space-y-3">
+                    {extractedProducts.map((product, idx) => (
+                      <div
+                        key={idx}
+                        className={`border rounded-lg p-4 transition-colors ${
+                          selectedProducts.has(idx)
+                            ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-700'
+                            : 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700'
+                        }`}
+                      >
+                        <div className="flex items-start gap-4">
+                          <input
+                            type="checkbox"
+                            checked={selectedProducts.has(idx)}
+                            onChange={() => toggleProductSelection(idx)}
+                            className="mt-1 w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                          />
+                          <div className="flex-1">
+                            <h3 className="font-medium text-gray-900 dark:text-white">
+                              {product.TITLE || 'Untitled Product'}
+                            </h3>
+                            {product.DESCRIPTION && (
+                              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                                {product.DESCRIPTION}
+                              </p>
                             )}
-                            {product.CONDITION && (
-                              <span className="text-gray-600 dark:text-gray-400">
-                                {product.CONDITION}
-                              </span>
-                            )}
+                            <div className="flex items-center gap-4 mt-2 text-sm">
+                              {product.PRICE && (
+                                <span className="text-green-600 dark:text-green-400 font-medium">
+                                  ${typeof product.PRICE === 'number' ? product.PRICE.toFixed(2) : product.PRICE}
+                                </span>
+                              )}
+                              {product.CONDITION && (
+                                <span className="text-gray-600 dark:text-gray-400">
+                                  {product.CONDITION}
+                                </span>
+                              )}
+                              {product.CATEGORY && (
+                                <span className="text-gray-600 dark:text-gray-400">
+                                  {product.CATEGORY}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                </>
               )}
             </div>
           )}
@@ -213,9 +349,13 @@ export function OCRResultsViewer({
             {extractedProducts.length > 0 && onProductsImport && (
               <button
                 onClick={handleImportProducts}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+                disabled={selectedProducts.size === 0}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
               >
-                Import {extractedProducts.length} Product{extractedProducts.length !== 1 ? 's' : ''}
+                Import {selectedProducts.size} Selected Product{selectedProducts.size !== 1 ? 's' : ''}
+                {importMode === 'append' && ' (Append)'}
+                {importMode === 'replace' && ' (Replace All)'}
+                {importMode === 'insert' && ` (Insert at Row ${insertAtRow})`}
               </button>
             )}
           </div>

@@ -333,8 +333,8 @@ function App() {
                     const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
                     fileInput?.click();
                   }}
-                  onOCRClick={isAuthenticated ? () => setShowOCRUpload(true) : undefined}
-                  showOCR={isAuthenticated}
+                  onOCRClick={() => setShowOCRUpload(true)}
+                  showOCR={true}
                 />
               </div>
             </div>
@@ -394,17 +394,19 @@ function App() {
               <Search size={20} />
             </button>
 
-            {/* OCR Upload button - only when authenticated */}
+            {/* OCR Upload button - available to all users (uses Tesseract.js if not authenticated) */}
+            <button
+              onClick={() => setShowOCRUpload(true)}
+              aria-label="Upload image for OCR processing"
+              className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors shadow-sm select-text"
+            >
+              <FileSpreadsheet size={16} aria-hidden="true" />
+              OCR
+            </button>
+
+            {/* Template Manager - only when authenticated */}
             {isAuthenticated && (
               <>
-                <button
-                  onClick={() => setShowOCRUpload(true)}
-                  aria-label="Upload image for OCR processing"
-                  className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors shadow-sm select-text"
-                >
-                  <FileSpreadsheet size={16} aria-hidden="true" />
-                  OCR
-                </button>
                 <button
                   onClick={() => setShowTemplateManager(true)}
                   aria-label="Manage templates"
@@ -578,25 +580,23 @@ function App() {
                     {/* Data Table Section - Show when we have data */}
                     {listings.length > 0 ? (
             <div className="space-y-6">
-              {/* Navigation to OCR Upload - only when authenticated */}
-              {isAuthenticated && (
-                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <FileSpreadsheet size={20} className="text-blue-600 dark:text-blue-400" />
-                      <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
-                        Extracted Data from OCR
-                      </span>
-                    </div>
-                    <button
-                      onClick={() => setShowOCRUpload(true)}
-                      className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-blue-700 dark:text-blue-300 hover:text-blue-900 dark:hover:text-blue-100 hover:underline"
-                    >
-                      ← Return to OCR Upload
-                    </button>
+              {/* Navigation to OCR Upload - available to all users */}
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <FileSpreadsheet size={20} className="text-blue-600 dark:text-blue-400" />
+                    <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                      Extracted Data from OCR
+                    </span>
                   </div>
+                  <button
+                    onClick={() => setShowOCRUpload(true)}
+                    className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-blue-700 dark:text-blue-300 hover:text-blue-900 dark:hover:text-blue-100 hover:underline"
+                  >
+                    ← Return to OCR Upload
+                  </button>
                 </div>
-              )}
+              </div>
 
               {/* Show export preview if active, otherwise show DataTable */}
               {exportPreviewContent ? (

@@ -11,6 +11,7 @@ import { useData } from '../contexts/DataContext';
 import { processWithPaddleOCR, processWithTesseract, checkBackendHealth } from '../services/ocrService';
 import { API_BASE } from '../config';
 import { OCRResultsViewer } from './OCRResultsViewer';
+import type { ImportOptions } from './OCRResultsViewer';
 import type { ParsedProduct } from '../types/ocr';
 import type { MarketplaceListing } from '../types';
 
@@ -52,7 +53,7 @@ interface HistoryScan {
 
 export function OCRUpload({ onProductsExtracted, onViewData }: OCRUploadProps) {
   const { isAuthenticated, accessToken } = useAuth();
-  const { setListings } = useData();
+  const { listings, setListings } = useData();
   const [activeTab, setActiveTab] = useState<TabView>('upload');
   const [fileJobs, setFileJobs] = useState<FileJob[]>([]);
   const [clearPrevious, setClearPrevious] = useState(true);
@@ -764,8 +765,25 @@ export function OCRUpload({ onProductsExtracted, onViewData }: OCRUploadProps) {
             'OFFER SHIPPING': 'Yes' as 'Yes' | 'No'
           }))}
           onClose={() => setSelectedJob(null)}
-          onProductsImport={(products) => {
-            setListings((prevListings: MarketplaceListing[]) => [...prevListings, ...products]);
+          onProductsImport={(products: MarketplaceListing[], options?: ImportOptions) => {
+            setListings((prevListings: MarketplaceListing[]) => {
+              // Handle different import modes
+              if (options?.mode === 'replace') {
+                // Replace all existing data
+                return products;
+              } else if (options?.mode === 'insert' && options.insertAtRow !== undefined) {
+                // Insert at specific row (1-based index)
+                const insertIndex = Math.max(0, Math.min(options.insertAtRow - 1, prevListings.length));
+                return [
+                  ...prevListings.slice(0, insertIndex),
+                  ...products,
+                  ...prevListings.slice(insertIndex)
+                ];
+              } else {
+                // Default: append to end
+                return [...prevListings, ...products];
+              }
+            });
             setSelectedJob(null);
             onViewData?.();
           }}
@@ -773,6 +791,7 @@ export function OCRUpload({ onProductsExtracted, onViewData }: OCRUploadProps) {
             // TODO: Implement reprocessing with adjusted image
             console.log('Reprocess with adjusted image:', processedImageUrl);
           }}
+          currentRowCount={listings.length}
         />
       )}
     </div>
