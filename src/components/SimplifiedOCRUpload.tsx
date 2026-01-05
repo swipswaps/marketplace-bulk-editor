@@ -267,8 +267,11 @@ export function SimplifiedOCRUpload({ onClose, onProductsImport }: SimplifiedOCR
       };
       setResults([placeholderResult]);
 
-      // Switch carousel to show the cropped image (index 1 = first result)
-      setCurrentImageIndex(1);
+      // Switch carousel to show the cropped image AFTER state updates
+      // Use setTimeout to ensure results array has updated
+      setTimeout(() => {
+        setCurrentImageIndex(1); // index 1 = first result (index 0 = original)
+      }, 100);
 
       setProcessingProgress(`Processing cropped area with ${ocrEngine}...`);
 
