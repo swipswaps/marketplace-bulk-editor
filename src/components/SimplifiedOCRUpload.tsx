@@ -771,11 +771,14 @@ export function SimplifiedOCRUpload({ onClose, onProductsImport }: SimplifiedOCR
                       name="ocr-engine"
                       value="tesseract"
                       checked={ocrEngine === 'tesseract'}
-                      onChange={(e) => setOcrEngine(e.target.value as 'paddleocr' | 'tesseract')}
+                      onChange={(e) => {
+                        setOcrEngine(e.target.value as 'paddleocr' | 'tesseract');
+                        setShowLoginWarning(false); // Tesseract doesn't require login
+                      }}
                       className="w-4 h-4 text-purple-600 bg-gray-100 border-gray-300 focus:ring-purple-500"
                     />
                     <span className="text-sm text-gray-700 dark:text-gray-300">
-                      Tesseract.js
+                      Tesseract.js (no login required)
                     </span>
                   </label>
                 </div>
