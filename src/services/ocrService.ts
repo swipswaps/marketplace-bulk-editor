@@ -62,15 +62,24 @@ export const processWithPaddleOCR = async (
   preprocessMethod?: string,
   enableMultiResolution?: boolean
 ): Promise<OcrResponse> => {
+  console.log('🔍 OCR SERVICE DEBUG: processWithPaddleOCR called');
+  console.log('🔍 OCR SERVICE DEBUG: File name:', file.name);
+  console.log('🔍 OCR SERVICE DEBUG: File size:', file.size, 'bytes');
+  console.log('🔍 OCR SERVICE DEBUG: File type:', file.type);
+
   onLog?.('Sending to PaddleOCR backend...', 'info');
 
   const formData = new FormData();
   formData.append('file', file);
+  console.log('🔍 OCR SERVICE DEBUG: Appended file to FormData');
+
   if (ocrEngine) {
     formData.append('ocr_engine', ocrEngine);
+    console.log('🔍 OCR SERVICE DEBUG: OCR engine:', ocrEngine);
   }
   if (preprocessMethod) {
     formData.append('preprocess_method', preprocessMethod);
+    console.log('🔍 OCR SERVICE DEBUG: Preprocess method:', preprocessMethod);
     onLog?.(`Using preprocessing method: ${preprocessMethod}`, 'info');
   }
   if (enableMultiResolution !== undefined) {
@@ -371,6 +380,11 @@ export const processWithTesseract = async (
   onLog?: LogFn,
   preprocessMethod: string = 'auto'
 ): Promise<OcrResponse> => {
+  console.log('🔍 TESSERACT DEBUG: processWithTesseract called');
+  console.log('🔍 TESSERACT DEBUG: File name:', file.name);
+  console.log('🔍 TESSERACT DEBUG: File size:', file.size, 'bytes');
+  console.log('🔍 TESSERACT DEBUG: File type:', file.type);
+
   onLog?.('Processing with Tesseract.js (browser fallback)...', 'info');
 
   // Preprocess image for better OCR with specified method

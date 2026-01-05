@@ -246,15 +246,27 @@ export function SimplifiedOCRUpload({ onClose, onProductsImport }: SimplifiedOCR
       setProcessingProgress('Cropping image...');
 
       // Crop image to selected area
-      console.log('Cropping image to area:', cropArea);
+      console.log('🔍 CROP DEBUG: Starting crop process');
+      console.log('🔍 CROP DEBUG: Crop area:', cropArea);
+      console.log('🔍 CROP DEBUG: Original uploaded file:', uploadedFile?.name, uploadedFile?.size, 'bytes');
+
       const croppedImageUrl = await cropImageToArea();
-      console.log('Image cropped successfully, data URL length:', croppedImageUrl.length);
+      console.log('🔍 CROP DEBUG: Image cropped successfully, data URL length:', croppedImageUrl.length);
 
       // Create a temporary file from cropped image
       const response = await fetch(croppedImageUrl);
       const blob = await response.blob();
       const croppedFile = new File([blob], 'cropped-image.png', { type: 'image/png' });
-      console.log('Created cropped file:', croppedFile.size, 'bytes');
+      console.log('🔍 CROP DEBUG: Created cropped file:', croppedFile.name, croppedFile.size, 'bytes');
+      console.log('🔍 CROP DEBUG: Original file size:', uploadedFile?.size, 'bytes');
+      console.log('🔍 CROP DEBUG: Cropped file size:', croppedFile.size, 'bytes');
+      console.log('🔍 CROP DEBUG: Size ratio:', (croppedFile.size / (uploadedFile?.size || 1) * 100).toFixed(1), '%');
+
+      // Verify we're using the cropped file, not the original
+      if (croppedFile.size >= (uploadedFile?.size || 0)) {
+        console.error('❌ CROP ERROR: Cropped file is LARGER than original! Something is wrong!');
+        alert('Error: Cropped file is larger than original. Crop may have failed.');
+      }
 
       // IMMEDIATELY show the cropped image to user by adding a placeholder result
       const placeholderResult = {
@@ -288,7 +300,10 @@ export function SimplifiedOCRUpload({ onClose, onProductsImport }: SimplifiedOCR
           return;
         }
         const token = localStorage.getItem('access_token') || '';
-        console.log('🚀 Starting PaddleOCR for cropped area...');
+        console.log('🚀 CROP DEBUG: Starting PaddleOCR for CROPPED area...');
+        console.log('🚀 CROP DEBUG: Sending file to PaddleOCR:', croppedFile.name, croppedFile.size, 'bytes');
+        console.log('🚀 CROP DEBUG: This should be SMALLER than original:', uploadedFile?.size, 'bytes');
+
         result = await processWithPaddleOCR(
           croppedFile,
           token,
@@ -299,9 +314,13 @@ export function SimplifiedOCRUpload({ onClose, onProductsImport }: SimplifiedOCR
           'paddleocr',
           'original'
         );
-        console.log('✅ PaddleOCR completed for cropped area');
+        console.log('✅ CROP DEBUG: PaddleOCR completed for cropped area');
+        console.log('✅ CROP DEBUG: OCR result text length:', result.raw_text.length, 'characters');
       } else {
-        console.log('🚀 Starting Tesseract for cropped area...');
+        console.log('🚀 CROP DEBUG: Starting Tesseract for CROPPED area...');
+        console.log('🚀 CROP DEBUG: Sending file to Tesseract:', croppedFile.name, croppedFile.size, 'bytes');
+        console.log('🚀 CROP DEBUG: This should be SMALLER than original:', uploadedFile?.size, 'bytes');
+
         result = await processWithTesseract(
           croppedFile,
           (msg) => {
@@ -310,7 +329,8 @@ export function SimplifiedOCRUpload({ onClose, onProductsImport }: SimplifiedOCR
           },
           'original'
         );
-        console.log('✅ Tesseract completed for cropped area');
+        console.log('✅ CROP DEBUG: Tesseract completed for cropped area');
+        console.log('✅ CROP DEBUG: OCR result text length:', result.raw_text.length, 'characters');
       }
 
       console.log('OCR result:', result);
