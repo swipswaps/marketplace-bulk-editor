@@ -5,7 +5,7 @@
  */
 
 import { useState, useRef } from 'react';
-import { FileImage, Loader, CheckCircle, X } from 'lucide-react';
+import { FileImage, Loader, CheckCircle, X, ChevronLeft, ChevronRight, Download } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { processWithTesseract, processWithPaddleOCR, checkBackendHealth } from '../services/ocrService';
 import type { ParsedProduct } from '../types/ocr';
@@ -41,6 +41,8 @@ export function SimplifiedOCRUpload({ onClose, onProductsImport }: SimplifiedOCR
   const [ocrEngine, setOcrEngine] = useState<'paddleocr' | 'tesseract'>('paddleocr');
   // Show warning immediately if PaddleOCR selected and not authenticated
   const [showLoginWarning, setShowLoginWarning] = useState(!isAuthenticated);
+  // Image carousel state - show original + all preprocessed images
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -207,30 +209,89 @@ export function SimplifiedOCRUpload({ onClose, onProductsImport }: SimplifiedOCR
           )}
 
           {/* Image Preview + Method Selector + Results */}
-          {uploadedImage && (
+          {uploadedImage && (() => {
+            // Build array of all images: original + preprocessed results
+            const allImages = [
+              { url: uploadedImage, label: 'Original', filename: uploadedFile?.name || 'uploaded-image.png' },
+              ...results.map(r => ({
+                url: r.preprocessedImageUrl || '',
+                label: r.method,
+                filename: `${r.method}-preprocessed.png`
+              })).filter(img => img.url)
+            ];
+            const currentImage = allImages[currentImageIndex] || allImages[0];
+
+            return (
             <div className="space-y-6">
-              {/* Image Preview - Clickable */}
+              {/* Image Carousel Preview */}
               <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4">
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">Image Preview</h3>
+                  <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {currentImage.label} ({currentImageIndex + 1}/{allImages.length})
+                  </h3>
                   <a
-                    href={uploadedImage}
-                    download={uploadedFile?.name || 'uploaded-image.png'}
-                    className="text-xs text-purple-600 dark:text-purple-400 hover:underline"
-                    title="Download original image"
+                    href={currentImage.url}
+                    download={currentImage.filename}
+                    className="text-xs text-purple-600 dark:text-purple-400 hover:underline flex items-center gap-1"
+                    title="Download current image"
                   >
-                    📥 Download Original
+                    <Download size={14} />
+                    Download
                   </a>
                 </div>
-                <a
-                  href={uploadedImage}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block cursor-pointer hover:opacity-80 transition-opacity"
-                  title="Click to open full image in new tab"
-                >
-                  <img src={uploadedImage} alt="Uploaded" className="max-h-64 mx-auto rounded border border-gray-300 dark:border-gray-600" />
-                </a>
+
+                {/* Image with navigation */}
+                <div className="relative">
+                  <img
+                    src={currentImage.url}
+                    alt={currentImage.label}
+                    className="max-h-64 mx-auto rounded border border-gray-300 dark:border-gray-600"
+                  />
+
+                  {/* Navigation buttons */}
+                  {allImages.length > 1 && (
+                    <>
+                      <button
+                        onClick={() => setCurrentImageIndex((currentImageIndex - 1 + allImages.length) % allImages.length)}
+                        className="absolute left-2 top-1/2 -translate-y-1/2 p-2 bg-black bg-opacity-50 hover:bg-opacity-70 text-white rounded-full transition-all"
+                        title="Previous image"
+                      >
+                        <ChevronLeft size={24} />
+                      </button>
+                      <button
+                        onClick={() => setCurrentImageIndex((currentImageIndex + 1) % allImages.length)}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-black bg-opacity-50 hover:bg-opacity-70 text-white rounded-full transition-all"
+                        title="Next image"
+                      >
+                        <ChevronRight size={24} />
+                      </button>
+                    </>
+                  )}
+                </div>
+
+                {/* Thumbnail slider */}
+                {allImages.length > 1 && (
+                  <div className="mt-4 flex gap-2 overflow-x-auto pb-2">
+                    {allImages.map((img, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => setCurrentImageIndex(idx)}
+                        className={`flex-shrink-0 w-20 h-20 rounded border-2 transition-all ${
+                          idx === currentImageIndex
+                            ? 'border-purple-600 dark:border-purple-400'
+                            : 'border-gray-300 dark:border-gray-600 hover:border-purple-400'
+                        }`}
+                        title={img.label}
+                      >
+                        <img
+                          src={img.url}
+                          alt={img.label}
+                          className="w-full h-full object-cover rounded"
+                        />
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* OCR Engine Selector */}
@@ -367,24 +428,7 @@ export function SimplifiedOCRUpload({ onClose, onProductsImport }: SimplifiedOCR
                           </div>
                         </div>
 
-                        {/* Preprocessed Image Preview - Clickable */}
-                        {result.preprocessedImageUrl && (
-                          <div className="mb-3">
-                            <a
-                              href={result.preprocessedImageUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="block cursor-pointer hover:opacity-80 transition-opacity"
-                              title="Click to open full image in new tab"
-                            >
-                              <img
-                                src={result.preprocessedImageUrl}
-                                alt={`${result.method} preprocessed`}
-                                className="w-full h-32 object-contain bg-white dark:bg-gray-900 rounded border border-gray-300 dark:border-gray-600"
-                              />
-                            </a>
-                          </div>
-                        )}
+                        {/* Note: Image shown in carousel above */}
 
                         {/* Full OCR Text in Textarea */}
                         <div className="flex-1 mb-3">
@@ -436,7 +480,8 @@ export function SimplifiedOCRUpload({ onClose, onProductsImport }: SimplifiedOCR
                 </div>
               )}
             </div>
-          )}
+            );
+          })()}
         </div>
       </div>
     </div>
