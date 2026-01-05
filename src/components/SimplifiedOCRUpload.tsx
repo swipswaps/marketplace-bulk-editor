@@ -4,8 +4,8 @@
  * Per Rule 16: Simplified workflow while preserving functionality
  */
 
-import { useState, useRef } from 'react';
-import { FileImage, Loader, CheckCircle, X, ChevronLeft, ChevronRight, Download } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { FileImage, Loader, CheckCircle, X, ChevronLeft, ChevronRight, Download, ZoomIn, ZoomOut, RotateCw, Maximize2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { processWithTesseract, processWithPaddleOCR, checkBackendHealth } from '../services/ocrService';
 import type { ParsedProduct } from '../types/ocr';
@@ -43,31 +43,102 @@ export function SimplifiedOCRUpload({ onClose, onProductsImport }: SimplifiedOCR
   const [showLoginWarning, setShowLoginWarning] = useState(!isAuthenticated);
   // Image carousel state - show original + all preprocessed images
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  // Zoom state - toggle between fit and 100% on double-click
-  const [isZoomed, setIsZoomed] = useState(false);
+  // Zoom state - precise zoom level (10% to 500%)
+  const [zoomLevel, setZoomLevel] = useState(100);
   // Crop state - for selecting area to OCR
   const [cropMode, setCropMode] = useState(false);
   const [cropArea, setCropArea] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
+  const [resizeHandle, setResizeHandle] = useState<string | null>(null);
+  // Image manipulation state
+  const [rotation, setRotation] = useState(0);
+  const [brightness, setBrightness] = useState(100);
+  const [contrast, setContrast] = useState(100);
   const imageRef = useRef<HTMLImageElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setUploadedFile(file);
-    
+
     // Create preview
     const reader = new FileReader();
     reader.onload = (e) => {
       setUploadedImage(e.target?.result as string);
     };
     reader.readAsDataURL(file);
-    
-    // Reset results
+
+    // Reset results and image state
     setResults([]);
+    setZoomLevel(100);
+    setRotation(0);
+    setBrightness(100);
+    setContrast(100);
+    setCropMode(false);
+    setCropArea(null);
   };
+
+  // Zoom handlers
+  const handleZoomIn = () => setZoomLevel(prev => Math.min(prev + 10, 500));
+  const handleZoomOut = () => setZoomLevel(prev => Math.max(prev - 10, 10));
+  const handleZoomReset = () => setZoomLevel(100);
+  const handleZoomFit = () => setZoomLevel(100);
+
+  // Mouse wheel zoom
+  const handleWheel = (e: React.WheelEvent) => {
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? -10 : 10;
+      setZoomLevel(prev => Math.max(10, Math.min(500, prev + delta)));
+    }
+  };
+
+  // Touch pinch zoom
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    let initialDistance = 0;
+    let initialZoom = 100;
+
+    const handleTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 2) {
+        const touch1 = e.touches[0];
+        const touch2 = e.touches[1];
+        initialDistance = Math.hypot(
+          touch2.clientX - touch1.clientX,
+          touch2.clientY - touch1.clientY
+        );
+        initialZoom = zoomLevel;
+      }
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (e.touches.length === 2) {
+        e.preventDefault();
+        const touch1 = e.touches[0];
+        const touch2 = e.touches[1];
+        const currentDistance = Math.hypot(
+          touch2.clientX - touch1.clientX,
+          touch2.clientY - touch1.clientY
+        );
+        const scale = currentDistance / initialDistance;
+        const newZoom = Math.max(10, Math.min(500, initialZoom * scale));
+        setZoomLevel(newZoom);
+      }
+    };
+
+    container.addEventListener('touchstart', handleTouchStart);
+    container.addEventListener('touchmove', handleTouchMove, { passive: false });
+
+    return () => {
+      container.removeEventListener('touchstart', handleTouchStart);
+      container.removeEventListener('touchmove', handleTouchMove);
+    };
+  }, [zoomLevel]);
 
   const toggleMethod = (method: PreprocessMethod) => {
     setSelectedMethods(prev => {
@@ -248,8 +319,74 @@ export function SimplifiedOCRUpload({ onClose, onProductsImport }: SimplifiedOCR
                   </a>
                 </div>
 
-                {/* Crop Mode Toggle */}
-                <div className="mb-2 flex gap-2">
+                {/* Image Tools Bar */}
+                <div className="mb-2 flex flex-wrap gap-2 items-center">
+                  {/* Zoom Controls */}
+                  <div className="flex items-center gap-1 bg-gray-200 dark:bg-gray-700 rounded px-2 py-1">
+                    <button
+                      onClick={handleZoomOut}
+                      className="p-1 hover:bg-gray-300 dark:hover:bg-gray-600 rounded transition-colors"
+                      title="Zoom out (Ctrl+Scroll)"
+                    >
+                      <ZoomOut size={16} />
+                    </button>
+                    <span className="text-xs font-mono min-w-[50px] text-center text-gray-700 dark:text-gray-300">
+                      {zoomLevel}%
+                    </span>
+                    <button
+                      onClick={handleZoomIn}
+                      className="p-1 hover:bg-gray-300 dark:hover:bg-gray-600 rounded transition-colors"
+                      title="Zoom in (Ctrl+Scroll)"
+                    >
+                      <ZoomIn size={16} />
+                    </button>
+                    <button
+                      onClick={handleZoomFit}
+                      className="p-1 hover:bg-gray-300 dark:hover:bg-gray-600 rounded transition-colors ml-1"
+                      title="Fit to screen"
+                    >
+                      <Maximize2 size={16} />
+                    </button>
+                  </div>
+
+                  {/* Rotate */}
+                  <button
+                    onClick={() => setRotation((rotation + 90) % 360)}
+                    className="p-1 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded transition-colors"
+                    title="Rotate 90°"
+                  >
+                    <RotateCw size={16} />
+                  </button>
+
+                  {/* Brightness */}
+                  <div className="flex items-center gap-1">
+                    <label className="text-xs text-gray-600 dark:text-gray-400">Brightness:</label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="200"
+                      value={brightness}
+                      onChange={(e) => setBrightness(Number(e.target.value))}
+                      className="w-20"
+                    />
+                    <span className="text-xs font-mono w-8 text-gray-700 dark:text-gray-300">{brightness}%</span>
+                  </div>
+
+                  {/* Contrast */}
+                  <div className="flex items-center gap-1">
+                    <label className="text-xs text-gray-600 dark:text-gray-400">Contrast:</label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="200"
+                      value={contrast}
+                      onChange={(e) => setContrast(Number(e.target.value))}
+                      className="w-20"
+                    />
+                    <span className="text-xs font-mono w-8 text-gray-700 dark:text-gray-300">{contrast}%</span>
+                  </div>
+
+                  {/* Crop Mode Toggle */}
                   <button
                     onClick={() => {
                       setCropMode(!cropMode);
@@ -261,8 +398,9 @@ export function SimplifiedOCRUpload({ onClose, onProductsImport }: SimplifiedOCR
                         : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
                     }`}
                   >
-                    {cropMode ? '✓ Crop Mode Active' : 'Enable Crop Mode'}
+                    {cropMode ? '✓ Crop Mode' : 'Crop Mode'}
                   </button>
+
                   {cropMode && cropArea && (
                     <button
                       onClick={() => {
@@ -271,14 +409,16 @@ export function SimplifiedOCRUpload({ onClose, onProductsImport }: SimplifiedOCR
                       }}
                       className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
                     >
-                      Crop & OCR Selected Area
+                      Crop & OCR
                     </button>
                   )}
                 </div>
 
                 {/* Image with navigation and crop overlay */}
                 <div
+                  ref={containerRef}
                   className="relative overflow-auto max-h-[600px] bg-gray-100 dark:bg-gray-800 rounded"
+                  onWheel={handleWheel}
                   onMouseDown={(e) => {
                     if (!cropMode || !imageRef.current) return;
                     const rect = imageRef.current.getBoundingClientRect();
@@ -306,10 +446,14 @@ export function SimplifiedOCRUpload({ onClose, onProductsImport }: SimplifiedOCR
                     src={currentImage.url}
                     alt={currentImage.label}
                     className={`mx-auto rounded border border-gray-300 dark:border-gray-600 transition-all ${
-                      isZoomed ? 'max-w-none cursor-zoom-out' : 'max-h-[600px] cursor-zoom-in'
-                    } ${cropMode ? 'cursor-crosshair' : ''}`}
-                    onDoubleClick={() => setIsZoomed(!isZoomed)}
-                    style={isZoomed ? { width: '100%' } : {}}
+                      cropMode ? 'cursor-crosshair' : 'cursor-grab'
+                    }`}
+                    style={{
+                      transform: `scale(${zoomLevel / 100}) rotate(${rotation}deg)`,
+                      filter: `brightness(${brightness}%) contrast(${contrast}%)`,
+                      maxHeight: zoomLevel === 100 ? '600px' : 'none',
+                      transformOrigin: 'center center'
+                    }}
                   />
 
                   {/* Crop overlay */}
@@ -353,31 +497,57 @@ export function SimplifiedOCRUpload({ onClose, onProductsImport }: SimplifiedOCR
                 {/* Zoom hint */}
                 {!cropMode && (
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">
-                    Double-click image to zoom {isZoomed ? 'out' : 'in'}
+                    Ctrl+Scroll to zoom • Pinch to zoom on touch devices
                   </p>
                 )}
 
-                {/* Thumbnail slider */}
+                {/* Thumbnail slider - Enhanced */}
                 {allImages.length > 1 && (
-                  <div className="mt-4 flex gap-2 overflow-x-auto pb-2">
-                    {allImages.map((img, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => setCurrentImageIndex(idx)}
-                        className={`flex-shrink-0 w-20 h-20 rounded border-2 transition-all ${
-                          idx === currentImageIndex
-                            ? 'border-purple-600 dark:border-purple-400'
-                            : 'border-gray-300 dark:border-gray-600 hover:border-purple-400'
-                        }`}
-                        title={img.label}
-                      >
-                        <img
-                          src={img.url}
-                          alt={img.label}
-                          className="w-full h-full object-cover rounded"
-                        />
-                      </button>
-                    ))}
+                  <div className="mt-4 bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                        All Images ({allImages.length})
+                      </h4>
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => setCurrentImageIndex((currentImageIndex - 1 + allImages.length) % allImages.length)}
+                          className="p-1 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded transition-colors"
+                          title="Previous"
+                        >
+                          <ChevronLeft size={14} />
+                        </button>
+                        <button
+                          onClick={() => setCurrentImageIndex((currentImageIndex + 1) % allImages.length)}
+                          className="p-1 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded transition-colors"
+                          title="Next"
+                        >
+                          <ChevronRight size={14} />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
+                      {allImages.map((img, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => setCurrentImageIndex(idx)}
+                          className={`flex-shrink-0 w-24 h-24 rounded border-2 transition-all relative ${
+                            idx === currentImageIndex
+                              ? 'border-purple-600 dark:border-purple-400 shadow-lg'
+                              : 'border-gray-300 dark:border-gray-600 hover:border-purple-400'
+                          }`}
+                          title={img.label}
+                        >
+                          <img
+                            src={img.url}
+                            alt={img.label}
+                            className="w-full h-full object-cover rounded"
+                          />
+                          <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-60 text-white text-xs px-1 py-0.5 truncate">
+                            {img.label}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
