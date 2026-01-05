@@ -140,6 +140,159 @@ export function SimplifiedOCRUpload({ onClose, onProductsImport }: SimplifiedOCR
     };
   }, [zoomLevel]);
 
+  // Crop image to selected area
+  const cropImageToArea = async (): Promise<string> => {
+    if (!cropArea || !imageRef.current || !uploadedImage) {
+      throw new Error('No crop area selected or image not loaded');
+    }
+
+    return new Promise((resolve, reject) => {
+      const displayedImg = imageRef.current!;
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+
+      if (!ctx) {
+        reject(new Error('Could not get canvas context'));
+        return;
+      }
+
+      // Load the ORIGINAL uploaded image (not the transformed display version)
+      const sourceImg = new Image();
+      sourceImg.crossOrigin = 'anonymous';
+
+      sourceImg.onload = () => {
+        // Calculate scale between displayed image and original image
+        // displayedImg.getBoundingClientRect() gives actual displayed size (after zoom/transform)
+        const displayRect = displayedImg.getBoundingClientRect();
+        const scaleX = sourceImg.naturalWidth / displayRect.width;
+        const scaleY = sourceImg.naturalHeight / displayRect.height;
+
+        // Calculate cropped area dimensions in original image coordinates
+        const cropX = cropArea.x * scaleX;
+        const cropY = cropArea.y * scaleY;
+        const cropWidth = cropArea.width * scaleX;
+        const cropHeight = cropArea.height * scaleY;
+
+        // Set canvas size to cropped area
+        canvas.width = cropWidth;
+        canvas.height = cropHeight;
+
+        // Draw cropped portion from original image
+        ctx.drawImage(
+          sourceImg,
+          cropX,      // source x
+          cropY,      // source y
+          cropWidth,  // source width
+          cropHeight, // source height
+          0,          // dest x
+          0,          // dest y
+          cropWidth,  // dest width
+          cropHeight  // dest height
+        );
+
+        // Convert to data URL
+        const croppedDataUrl = canvas.toDataURL('image/png');
+        console.log(`Cropped image: ${cropWidth}x${cropHeight}px from original ${sourceImg.naturalWidth}x${sourceImg.naturalHeight}px`);
+        resolve(croppedDataUrl);
+      };
+
+      sourceImg.onerror = () => reject(new Error('Failed to load original image'));
+      // Use the ORIGINAL uploaded image, not the displayed/transformed one
+      sourceImg.src = uploadedImage;
+    });
+  };
+
+  // Process OCR on cropped area
+  const processCroppedArea = async () => {
+    if (!cropArea) {
+      console.error('No crop area selected');
+      alert('Please select an area to crop first');
+      return;
+    }
+
+    console.log('Starting crop processing...', { cropArea, ocrEngine, isAuthenticated });
+
+    try {
+      setIsProcessing(true);
+      setProcessingProgress('Cropping image...');
+
+      // Crop image to selected area
+      console.log('Cropping image to area:', cropArea);
+      const croppedImageUrl = await cropImageToArea();
+      console.log('Image cropped successfully, data URL length:', croppedImageUrl.length);
+
+      // Create a temporary file from cropped image
+      const response = await fetch(croppedImageUrl);
+      const blob = await response.blob();
+      const croppedFile = new File([blob], 'cropped-image.png', { type: 'image/png' });
+      console.log('Created cropped file:', croppedFile.size, 'bytes');
+
+      setProcessingProgress(`Processing cropped area with ${ocrEngine}...`);
+
+      // Process with selected OCR engine
+      let result;
+      if (ocrEngine === 'paddleocr') {
+        if (!isAuthenticated) {
+          console.error('Not authenticated for PaddleOCR');
+          alert('Please log in to use PaddleOCR');
+          setIsProcessing(false);
+          setProcessingProgress('');
+          return;
+        }
+        const token = localStorage.getItem('access_token') || '';
+        console.log('Processing with PaddleOCR...');
+        result = await processWithPaddleOCR(
+          croppedFile,
+          token,
+          (msg) => {
+            console.log('PaddleOCR progress:', msg);
+            setProcessingProgress(msg);
+          },
+          'paddleocr',
+          'original'
+        );
+      } else {
+        console.log('Processing with Tesseract...');
+        result = await processWithTesseract(
+          croppedFile,
+          (msg) => {
+            console.log('Tesseract progress:', msg);
+            setProcessingProgress(msg);
+          },
+          'original'
+        );
+      }
+
+      console.log('OCR result:', result);
+
+      // Convert OCR response to ProcessingResult format
+      const processedResult = {
+        method: `Cropped Area (${ocrEngine})`,
+        text: result.raw_text,
+        confidence: result.confidence_score || 0,
+        productCount: result.parsed.products.length,
+        products: result.parsed.products,
+        preprocessedImageUrl: croppedImageUrl
+      };
+
+      console.log('Processed result:', processedResult);
+
+      // Add result
+      setResults([processedResult]);
+
+      setProcessingProgress('');
+      setIsProcessing(false);
+      setCropMode(false);
+      setCropArea(null);
+      console.log('Crop processing complete!');
+    } catch (error) {
+      console.error('Crop processing error:', error);
+      alert(`Error processing cropped area: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setIsProcessing(false);
+      setProcessingProgress('');
+    }
+  };
+
   const toggleMethod = (method: PreprocessMethod) => {
     setSelectedMethods(prev => {
       const newSet = new Set(prev);
@@ -401,12 +554,9 @@ export function SimplifiedOCRUpload({ onClose, onProductsImport }: SimplifiedOCR
                     {cropMode ? '✓ Crop Mode' : 'Crop Mode'}
                   </button>
 
-                  {cropMode && cropArea && (
+                  {cropMode && cropArea && !isProcessing && (
                     <button
-                      onClick={() => {
-                        // TODO: Process only cropped area
-                        alert('Crop & OCR feature coming soon!');
-                      }}
+                      onClick={processCroppedArea}
                       className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
                     >
                       Crop & OCR
