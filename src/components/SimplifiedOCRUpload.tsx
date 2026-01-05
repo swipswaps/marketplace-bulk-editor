@@ -256,6 +256,20 @@ export function SimplifiedOCRUpload({ onClose, onProductsImport }: SimplifiedOCR
       const croppedFile = new File([blob], 'cropped-image.png', { type: 'image/png' });
       console.log('Created cropped file:', croppedFile.size, 'bytes');
 
+      // IMMEDIATELY show the cropped image to user by adding a placeholder result
+      const placeholderResult = {
+        method: `Cropped Area (${ocrEngine}) - Processing...`,
+        text: 'Processing OCR...',
+        confidence: 0,
+        productCount: 0,
+        products: [],
+        preprocessedImageUrl: croppedImageUrl
+      };
+      setResults([placeholderResult]);
+
+      // Switch carousel to show the cropped image (index 1 = first result)
+      setCurrentImageIndex(1);
+
       setProcessingProgress(`Processing cropped area with ${ocrEngine}...`);
 
       // Process with selected OCR engine
@@ -310,7 +324,7 @@ export function SimplifiedOCRUpload({ onClose, onProductsImport }: SimplifiedOCR
 
       console.log('Processed result:', processedResult);
 
-      // Add result
+      // UPDATE the placeholder result with actual OCR results
       setResults([processedResult]);
 
       setProcessingProgress('');
