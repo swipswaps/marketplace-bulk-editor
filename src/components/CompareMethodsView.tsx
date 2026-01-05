@@ -109,12 +109,18 @@ export function CompareMethodsView({ comparisonHistory, originalImageUrl, onImpo
         </div>
       </div>
 
-      {/* Image Comparison Slider */}
+      {/* Image Comparison - Side by Side */}
       <div className="bg-white dark:bg-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
-        <img-comparison-slider>
-          <img slot="first" src={originalImageUrl} alt={leftResult.method} />
-          <img slot="second" src={originalImageUrl} alt={rightResult.method} />
-        </img-comparison-slider>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{leftResult.method}</h4>
+            <img src={originalImageUrl} alt={leftResult.method} className="w-full rounded border border-gray-300 dark:border-gray-600" />
+          </div>
+          <div>
+            <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{rightResult.method}</h4>
+            <img src={originalImageUrl} alt={rightResult.method} className="w-full rounded border border-gray-300 dark:border-gray-600" />
+          </div>
+        </div>
       </div>
 
       {/* Results Comparison */}
@@ -132,7 +138,7 @@ export function CompareMethodsView({ comparisonHistory, originalImageUrl, onImpo
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600 dark:text-gray-400">Processed:</span>
-              <span className="font-medium">{new Date(leftResult.timestamp).toLocaleTimeString()}</span>
+              <span className="font-medium">{leftResult.timestamp ? new Date(leftResult.timestamp).toLocaleTimeString() : 'N/A'}</span>
             </div>
           </div>
         </div>

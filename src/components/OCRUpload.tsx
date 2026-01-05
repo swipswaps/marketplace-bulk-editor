@@ -11,9 +11,8 @@ import { useData } from '../contexts/DataContext';
 import { processWithPaddleOCR, processWithTesseract, checkBackendHealth } from '../services/ocrService';
 import { API_BASE } from '../config';
 import { OCRResultsViewer } from './OCRResultsViewer';
-import type { ImportOptions } from './OCRResultsViewer';
 import type { ParsedProduct } from '../types/ocr';
-import type { MarketplaceListing } from '../types';
+import type { MarketplaceListing, ImportOptions } from '../types';
 
 interface OCRUploadProps {
   onProductsExtracted?: (products: ParsedProduct[]) => void;
@@ -351,7 +350,7 @@ export function OCRUpload({ onProductsExtracted, onViewData }: OCRUploadProps) {
         const initialComparisonHistory = [{
           method: 'Original',
           text: result.raw_text,
-          confidence: result.confidence_score,
+          confidence: result.confidence_score || 0,
           productCount: newListings.length,
           timestamp: Date.now()
         }];
@@ -367,7 +366,7 @@ export function OCRUpload({ onProductsExtracted, onViewData }: OCRUploadProps) {
           progress: 'Completed',
           productsExtracted: newListings.length,
           ocrText: result.raw_text,
-          confidence: result.confidence_score,
+          confidence: result.confidence_score || 0,
           extractedProducts: result.parsed.products,
           comparisonHistory: initialComparisonHistory
         };
@@ -1029,16 +1028,16 @@ export function OCRUpload({ onProductsExtracted, onViewData }: OCRUploadProps) {
 
               if (result) {
                 console.log('[Reprocess] OCR complete, updating results:', {
-                  textLength: result.text.length,
-                  confidence: result.confidence,
+                  textLength: result.raw_text.length,
+                  confidence: result.confidence_score,
                   productCount: result.parsed.products.length
                 });
 
                 // Create new comparison result
                 const newComparisonResult: ComparisonResult = {
                   method: `Reprocessed #${(selectedJob.comparisonHistory?.length || 0) + 1}`,
-                  text: result.text,
-                  confidence: result.confidence,
+                  text: result.raw_text,
+                  confidence: result.confidence_score || 0,
                   productCount: result.parsed.products.length,
                   timestamp: Date.now()
                 };
@@ -1047,8 +1046,8 @@ export function OCRUpload({ onProductsExtracted, onViewData }: OCRUploadProps) {
                 const updatedJobData = {
                   status: 'completed' as const,
                   progress: 'Reprocessing complete',
-                  ocrText: result.text,
-                  confidence: result.confidence,
+                  ocrText: result.raw_text,
+                  confidence: result.confidence_score || 0,
                   extractedProducts: result.parsed.products,
                   productsExtracted: result.parsed.products.length,
                   preview: processedImageUrl,
