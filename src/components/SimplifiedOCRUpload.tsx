@@ -38,9 +38,9 @@ export function SimplifiedOCRUpload({ onClose, onProductsImport }: SimplifiedOCR
   const isCancelledRef = useRef(false); // Use ref for immediate cancellation
   const [results, setResults] = useState<ProcessingResult[]>([]);
   const [processingProgress, setProcessingProgress] = useState('');
-  const [ocrEngine, setOcrEngine] = useState<'paddleocr' | 'tesseract'>('paddleocr');
+  const [ocrEngine, setOcrEngine] = useState<'paddleocr' | 'tesseract'>('tesseract'); // Default to Tesseract (no login required)
   // Show warning immediately if PaddleOCR selected and not authenticated
-  const [showLoginWarning, setShowLoginWarning] = useState(!isAuthenticated);
+  const [showLoginWarning, setShowLoginWarning] = useState(false); // Default to false since Tesseract is default
   // Image carousel state - show original + all preprocessed images
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   // Zoom state - precise zoom level (10% to 500%)
