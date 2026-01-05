@@ -5,6 +5,29 @@ echo "==========================================="
 echo "Marketplace Bulk Editor - Docker Setup"
 echo "==========================================="
 echo ""
+
+# Clean up any existing containers and processes FIRST
+echo "Cleaning up existing containers and processes..."
+docker compose down --remove-orphans 2>/dev/null || true
+docker ps -a | grep marketplace | awk '{print $1}' | xargs -r docker rm -f 2>/dev/null || true
+
+# Kill processes using ports 5173 and 5000
+fuser -k 5173/tcp 2>/dev/null || true
+fuser -k 5000/tcp 2>/dev/null || true
+
+# Kill Flask/Gunicorn/PaddleOCR processes
+pkill -9 -f "flask run" 2>/dev/null || true
+pkill -9 -f "gunicorn.*app:app" 2>/dev/null || true
+pkill -9 -f "python.*app.py" 2>/dev/null || true
+pkill -9 -f "paddleocr" 2>/dev/null || true
+
+# Kill Vite dev server
+pkill -9 -f "vite" 2>/dev/null || true
+pkill -9 -f "npm run dev" 2>/dev/null || true
+
+echo "✓ Cleanup complete"
+echo ""
+
 echo "Using docker-compose.yml configuration..."
 echo ""
 
