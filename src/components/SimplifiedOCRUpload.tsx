@@ -142,13 +142,12 @@ export function SimplifiedOCRUpload({ onClose, onProductsImport }: SimplifiedOCR
 
   // Crop image to selected area
   const cropImageToArea = async (): Promise<string> => {
-    if (!cropArea || !imageRef.current || !containerRef.current || !uploadedImage) {
+    if (!cropArea || !imageRef.current || !uploadedImage) {
       throw new Error('No crop area selected or image not loaded');
     }
 
     return new Promise((resolve, reject) => {
       const displayedImg = imageRef.current!;
-      const container = containerRef.current!;
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
 
@@ -162,44 +161,24 @@ export function SimplifiedOCRUpload({ onClose, onProductsImport }: SimplifiedOCR
       sourceImg.crossOrigin = 'anonymous';
 
       sourceImg.onload = () => {
-        // Crop area coordinates are relative to CONTAINER
-        // Image is centered in container and may be zoomed/rotated
-        // Need to map container coordinates to image coordinates
+        // Crop area coordinates are now relative to the DISPLAYED image element
+        // (because mouse events are on the wrapper div around the image)
 
-        const containerRect = container.getBoundingClientRect();
+        // Get the displayed image's bounding rect (includes zoom transform)
         const imageRect = displayedImg.getBoundingClientRect();
 
-        // Calculate image position within container
-        const imageOffsetX = imageRect.left - containerRect.left;
-        const imageOffsetY = imageRect.top - containerRect.top;
-
-        // Adjust crop coordinates to be relative to image (not container)
-        const cropRelativeToImage = {
-          x: cropArea.x - imageOffsetX,
-          y: cropArea.y - imageOffsetY,
-          width: cropArea.width,
-          height: cropArea.height
-        };
-
-        // Get the displayed image's natural size (before CSS transforms)
+        // Get the displayed image's natural size (original pixels)
         const naturalWidth = displayedImg.naturalWidth;
         const naturalHeight = displayedImg.naturalHeight;
 
-        // Get the displayed image's rendered size (after max-height but before zoom/rotate)
-        const displayedWidth = displayedImg.width;
-        const displayedHeight = displayedImg.height;
-
-        // Calculate scale from displayed size to natural size
-        const scaleX = naturalWidth / displayedWidth;
-        const scaleY = naturalHeight / displayedHeight;
+        // Calculate scale from DISPLAYED size (after zoom) to NATURAL size
+        // imageRect.width includes the zoom transform
+        const scaleX = naturalWidth / imageRect.width;
+        const scaleY = naturalHeight / imageRect.height;
 
         console.log('Crop mapping:', {
           cropArea,
-          cropRelativeToImage,
-          containerRect: { width: containerRect.width, height: containerRect.height },
           imageRect: { width: imageRect.width, height: imageRect.height },
-          imageOffset: { x: imageOffsetX, y: imageOffsetY },
-          displayedSize: { width: displayedWidth, height: displayedHeight },
           naturalSize: { width: naturalWidth, height: naturalHeight },
           scale: { x: scaleX, y: scaleY },
           zoomLevel,
@@ -207,10 +186,10 @@ export function SimplifiedOCRUpload({ onClose, onProductsImport }: SimplifiedOCR
         });
 
         // Map crop coordinates from displayed image to natural image
-        const cropX = cropRelativeToImage.x * scaleX;
-        const cropY = cropRelativeToImage.y * scaleY;
-        const cropWidth = cropRelativeToImage.width * scaleX;
-        const cropHeight = cropRelativeToImage.height * scaleY;
+        const cropX = cropArea.x * scaleX;
+        const cropY = cropArea.y * scaleY;
+        const cropWidth = cropArea.width * scaleX;
+        const cropHeight = cropArea.height * scaleY;
 
         // Clamp to image boundaries
         const clampedX = Math.max(0, Math.min(cropX, naturalWidth));
@@ -242,7 +221,7 @@ export function SimplifiedOCRUpload({ onClose, onProductsImport }: SimplifiedOCR
 
         // Convert to data URL
         const croppedDataUrl = canvas.toDataURL('image/png');
-        console.log(`Cropped image: ${clampedWidth}x${clampedHeight}px from original ${sourceImg.naturalWidth}x${sourceImg.naturalHeight}px`);
+        console.log(`✅ Cropped image: ${Math.round(clampedWidth)}x${Math.round(clampedHeight)}px from original ${sourceImg.naturalWidth}x${sourceImg.naturalHeight}px`);
         resolve(croppedDataUrl);
       };
 
@@ -617,61 +596,69 @@ export function SimplifiedOCRUpload({ onClose, onProductsImport }: SimplifiedOCR
                 {/* Image with navigation and crop overlay */}
                 <div
                   ref={containerRef}
-                  className="relative overflow-auto max-h-[600px] bg-gray-100 dark:bg-gray-800 rounded"
+                  className="relative overflow-auto max-h-[600px] bg-gray-100 dark:bg-gray-800 rounded p-4"
                   onWheel={handleWheel}
-                  onMouseDown={(e) => {
-                    if (!cropMode || !containerRef.current) return;
-                    const rect = containerRef.current.getBoundingClientRect();
-                    setIsDragging(true);
-                    setDragStart({ x: e.clientX - rect.left, y: e.clientY - rect.top });
-                    setCropArea(null);
-                  }}
-                  onMouseMove={(e) => {
-                    if (!cropMode || !isDragging || !dragStart || !containerRef.current) return;
-                    const rect = containerRef.current.getBoundingClientRect();
-                    const currentX = e.clientX - rect.left;
-                    const currentY = e.clientY - rect.top;
-                    setCropArea({
-                      x: Math.min(dragStart.x, currentX),
-                      y: Math.min(dragStart.y, currentY),
-                      width: Math.abs(currentX - dragStart.x),
-                      height: Math.abs(currentY - dragStart.y)
-                    });
-                  }}
-                  onMouseUp={() => setIsDragging(false)}
-                  onMouseLeave={() => setIsDragging(false)}
                 >
-                  <img
-                    ref={imageRef}
-                    src={currentImage.url}
-                    alt={currentImage.label}
-                    className={`mx-auto rounded border border-gray-300 dark:border-gray-600 transition-all ${
-                      cropMode ? 'cursor-crosshair' : 'cursor-grab'
-                    }`}
-                    style={{
-                      transform: `scale(${zoomLevel / 100}) rotate(${rotation}deg)`,
-                      filter: `brightness(${brightness}%) contrast(${contrast}%)`,
-                      maxHeight: zoomLevel === 100 ? '600px' : 'none',
-                      transformOrigin: 'center center'
+                  <div
+                    className="relative inline-block mx-auto"
+                    onMouseDown={(e) => {
+                      if (!cropMode || !imageRef.current) return;
+                      e.preventDefault();
+                      const rect = imageRef.current.getBoundingClientRect();
+                      const x = e.clientX - rect.left;
+                      const y = e.clientY - rect.top;
+                      setIsDragging(true);
+                      setDragStart({ x, y });
+                      setCropArea(null);
                     }}
-                  />
-
-                  {/* Crop overlay */}
-                  {cropMode && cropArea && (
-                    <div
-                      className="absolute border-2 border-purple-600 bg-purple-600 bg-opacity-20 pointer-events-none"
+                    onMouseMove={(e) => {
+                      if (!cropMode || !isDragging || !dragStart || !imageRef.current) return;
+                      const rect = imageRef.current.getBoundingClientRect();
+                      const currentX = e.clientX - rect.left;
+                      const currentY = e.clientY - rect.top;
+                      setCropArea({
+                        x: Math.min(dragStart.x, currentX),
+                        y: Math.min(dragStart.y, currentY),
+                        width: Math.abs(currentX - dragStart.x),
+                        height: Math.abs(currentY - dragStart.y)
+                      });
+                    }}
+                    onMouseUp={() => setIsDragging(false)}
+                    onMouseLeave={() => setIsDragging(false)}
+                  >
+                    <img
+                      ref={imageRef}
+                      src={currentImage.url}
+                      alt={currentImage.label}
+                      className={`rounded border border-gray-300 dark:border-gray-600 transition-all ${
+                        cropMode ? 'cursor-crosshair' : 'cursor-grab'
+                      }`}
                       style={{
-                        left: cropArea.x,
-                        top: cropArea.y,
-                        width: cropArea.width,
-                        height: cropArea.height
+                        transform: `scale(${zoomLevel / 100}) rotate(${rotation}deg)`,
+                        filter: `brightness(${brightness}%) contrast(${contrast}%)`,
+                        maxHeight: zoomLevel === 100 ? '600px' : 'none',
+                        transformOrigin: 'center center',
+                        display: 'block'
                       }}
-                    >
-                      <div className="absolute -top-6 left-0 bg-purple-600 text-white text-xs px-2 py-1 rounded">
-                        {Math.round(cropArea.width)} × {Math.round(cropArea.height)}
+                    />
+
+                    {/* Crop overlay - positioned relative to image */}
+                    {cropMode && cropArea && (
+                      <div
+                        className="absolute border-2 border-purple-600 bg-purple-600 bg-opacity-20 pointer-events-none"
+                        style={{
+                          left: cropArea.x,
+                          top: cropArea.y,
+                          width: cropArea.width,
+                          height: cropArea.height
+                        }}
+                      >
+                        <div className="absolute -top-6 left-0 bg-purple-600 text-white text-xs px-2 py-1 rounded">
+                          {Math.round(cropArea.width)} × {Math.round(cropArea.height)}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
 
                   {/* Navigation buttons */}
                   {allImages.length > 1 && !cropMode && (
