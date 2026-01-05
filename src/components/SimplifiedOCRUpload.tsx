@@ -260,16 +260,18 @@ export function SimplifiedOCRUpload({ onClose, onProductsImport }: SimplifiedOCR
 
       // Process with selected OCR engine
       let result;
+      let actualEngineUsed = ocrEngine; // Track which engine ACTUALLY ran
+
       if (ocrEngine === 'paddleocr') {
         if (!isAuthenticated) {
-          console.error('Not authenticated for PaddleOCR');
+          console.error('❌ Not authenticated for PaddleOCR');
           alert('Please log in to use PaddleOCR');
           setIsProcessing(false);
           setProcessingProgress('');
           return;
         }
         const token = localStorage.getItem('access_token') || '';
-        console.log('Processing with PaddleOCR...');
+        console.log('🚀 Starting PaddleOCR for cropped area...');
         result = await processWithPaddleOCR(
           croppedFile,
           token,
@@ -280,8 +282,9 @@ export function SimplifiedOCRUpload({ onClose, onProductsImport }: SimplifiedOCR
           'paddleocr',
           'original'
         );
+        console.log('✅ PaddleOCR completed for cropped area');
       } else {
-        console.log('Processing with Tesseract...');
+        console.log('🚀 Starting Tesseract for cropped area...');
         result = await processWithTesseract(
           croppedFile,
           (msg) => {
@@ -290,13 +293,14 @@ export function SimplifiedOCRUpload({ onClose, onProductsImport }: SimplifiedOCR
           },
           'original'
         );
+        console.log('✅ Tesseract completed for cropped area');
       }
 
       console.log('OCR result:', result);
 
       // Convert OCR response to ProcessingResult format
       const processedResult = {
-        method: `Cropped Area (${ocrEngine})`,
+        method: `Cropped Area (${actualEngineUsed})`, // Show which engine ACTUALLY ran
         text: result.raw_text,
         confidence: result.confidence_score || 0,
         productCount: result.parsed.products.length,
@@ -344,14 +348,18 @@ export function SimplifiedOCRUpload({ onClose, onProductsImport }: SimplifiedOCR
 
     try {
       // Determine which OCR engine to use
+      let actualEngine = ocrEngine; // Track which engine we're TRYING to use
       const usePaddleOCR = ocrEngine === 'paddleocr' && isAuthenticated && accessToken;
 
       if (usePaddleOCR) {
         // Check backend health
         const backendHealthy = await checkBackendHealth();
         if (!backendHealthy) {
+          console.warn('⚠️ PaddleOCR backend unavailable, falling back to Tesseract');
           setProcessingProgress('Backend unavailable, falling back to Tesseract...');
-          setOcrEngine('tesseract');
+          actualEngine = 'tesseract'; // Track fallback, but don't change UI state
+        } else {
+          console.log('✅ PaddleOCR backend healthy, using PaddleOCR');
         }
       }
 
@@ -363,12 +371,14 @@ export function SimplifiedOCRUpload({ onClose, onProductsImport }: SimplifiedOCR
           break;
         }
 
-        setProcessingProgress(`Processing with ${method}...`);
+        let engineUsedForThisMethod = actualEngine; // Track which engine ACTUALLY ran for this method
+        setProcessingProgress(`Processing with ${method} using ${actualEngine}...`);
 
         let result;
 
-        if (usePaddleOCR && accessToken) {
+        if (usePaddleOCR && accessToken && actualEngine === 'paddleocr') {
           try {
+            console.log(`🚀 Starting PaddleOCR for method: ${method}`);
             result = await processWithPaddleOCR(
               uploadedFile,
               accessToken,
@@ -379,25 +389,30 @@ export function SimplifiedOCRUpload({ onClose, onProductsImport }: SimplifiedOCR
               method === 'upscale' ? 'upscale' : 'auto',
               true // enableMultiResolution
             );
+            console.log(`✅ PaddleOCR completed for method: ${method}`);
           } catch (error) {
-            console.error(`PaddleOCR failed for ${method}, falling back to Tesseract:`, error);
+            console.error(`❌ PaddleOCR failed for ${method}, falling back to Tesseract:`, error);
+            engineUsedForThisMethod = 'tesseract'; // Track fallback
             result = await processWithTesseract(
               uploadedFile,
               (msg) => setProcessingProgress(msg),
               method
             );
+            console.log(`✅ Tesseract fallback completed for method: ${method}`);
           }
         } else {
+          console.log(`🚀 Starting Tesseract for method: ${method}`);
           result = await processWithTesseract(
             uploadedFile,
             (msg) => setProcessingProgress(msg),
             method
           );
+          console.log(`✅ Tesseract completed for method: ${method}`);
         }
 
         if (result.success) {
           const newResult = {
-            method,
+            method: `${method} (${engineUsedForThisMethod})`, // Show which engine ACTUALLY ran
             text: result.raw_text,
             confidence: result.confidence_score || 0,
             productCount: result.parsed.products.length,
@@ -413,8 +428,9 @@ export function SimplifiedOCRUpload({ onClose, onProductsImport }: SimplifiedOCR
 
       setResults(newResults);
       setProcessingProgress('');
+      console.log(`✅ All processing complete. Processed ${newResults.length} methods.`);
     } catch (error) {
-      console.error('Processing error:', error);
+      console.error('❌ Processing error:', error);
       setProcessingProgress('Error processing image');
     } finally {
       setIsProcessing(false);

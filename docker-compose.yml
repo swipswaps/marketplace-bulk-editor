@@ -41,10 +41,10 @@ services:
       dockerfile: Dockerfile
     container_name: marketplace-backend
     environment:
-      - FLASK_ENV=development
+      - FLASK_ENV=production  # Use production mode to avoid debug overhead
       - FLASK_APP=app.py
-      - FLASK_DEBUG=1
-      - LOG_LEVEL=DEBUG
+      - FLASK_DEBUG=0  # Disable debug mode
+      - LOG_LEVEL=INFO  # Reduce logging overhead
       - DATABASE_URL=postgresql://marketplace_user:marketplace_pass@postgres:5432/marketplace_db
       - REDIS_URL=redis://redis:6379/0
       - JWT_SECRET_KEY=dev-jwt-secret-change-in-production
@@ -63,7 +63,21 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: flask run --host=0.0.0.0 --port=5000 --debug
+    # Use Gunicorn with limited workers instead of Flask dev server
+    # 2 workers = 2 processes (each loads PaddleOCR model once = 3GB total instead of 24GB)
+    # gevent worker class = async I/O for better concurrency
+    # timeout 300s = allow long OCR processing
+    # max-requests = restart workers after 1000 requests to prevent memory leaks
+    command: gunicorn --bind 0.0.0.0:5000 --workers 2 --worker-class gevent --timeout 300 --max-requests 1000 --max-requests-jitter 50 --log-level info app:app
+    # Resource limits to prevent memory exhaustion
+    deploy:
+      resources:
+        limits:
+          memory: 4G  # Limit to 4GB (2 workers × 1.5GB PaddleOCR + 1GB overhead)
+          cpus: '2.0'  # Limit to 2 CPU cores
+        reservations:
+          memory: 2G  # Reserve at least 2GB
+          cpus: '1.0'  # Reserve at least 1 CPU core
     networks:
       - marketplace-network
 

@@ -1,0 +1,35 @@
+# Production Docker Compose Override
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# This file optimizes the backend for production use:
+# - Uses Gunicorn instead of Flask dev server
+# - Limits workers to prevent memory exhaustion
+# - Disables debug mode and verbose logging
+# - Adds worker recycling to prevent memory leaks
+
+version: '3.8'
+
+services:
+  backend:
+    environment:
+      - FLASK_ENV=production
+      - FLASK_DEBUG=0
+      - LOG_LEVEL=WARNING  # Even less logging in production
+    # Gunicorn with optimized settings for PaddleOCR
+    # 2 workers = 2 processes × 1.5GB PaddleOCR model = 3GB total
+    # vs Flask dev server with 16+ processes = 24GB total
+    command: >
+      gunicorn
+      --bind 0.0.0.0:5000
+      --workers 2
+      --worker-class gevent
+      --worker-connections 1000
+      --timeout 300
+      --graceful-timeout 30
+      --max-requests 1000
+      --max-requests-jitter 50
+      --log-level warning
+      --access-logfile -
+      --error-logfile -
+      app:app
+
