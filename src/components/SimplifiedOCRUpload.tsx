@@ -315,14 +315,17 @@ export function SimplifiedOCRUpload({ onClose, onProductsImport }: SimplifiedOCR
 
       setProcessingProgress('');
       setIsProcessing(false);
-      setCropMode(false);
-      setCropArea(null);
-      console.log('Crop processing complete!');
+      // DON'T clear crop mode/area - let user see the cropped region and result
+      // User can manually exit crop mode if desired
+      console.log('✅ Crop processing complete! Result added to results list.');
     } catch (error) {
-      console.error('Crop processing error:', error);
+      console.error('❌ Crop processing error:', error);
       alert(`Error processing cropped area: ${error instanceof Error ? error.message : 'Unknown error'}`);
       setIsProcessing(false);
       setProcessingProgress('');
+      // Clear crop mode on error
+      setCropMode(false);
+      setCropArea(null);
     }
   };
 
