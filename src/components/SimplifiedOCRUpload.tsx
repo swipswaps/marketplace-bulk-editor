@@ -43,6 +43,14 @@ export function SimplifiedOCRUpload({ onClose, onProductsImport }: SimplifiedOCR
   const [showLoginWarning, setShowLoginWarning] = useState(!isAuthenticated);
   // Image carousel state - show original + all preprocessed images
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  // Zoom state - toggle between fit and 100% on double-click
+  const [isZoomed, setIsZoomed] = useState(false);
+  // Crop state - for selecting area to OCR
+  const [cropMode, setCropMode] = useState(false);
+  const [cropArea, setCropArea] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
+  const imageRef = useRef<HTMLImageElement>(null);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -240,16 +248,89 @@ export function SimplifiedOCRUpload({ onClose, onProductsImport }: SimplifiedOCR
                   </a>
                 </div>
 
-                {/* Image with navigation */}
-                <div className="relative">
+                {/* Crop Mode Toggle */}
+                <div className="mb-2 flex gap-2">
+                  <button
+                    onClick={() => {
+                      setCropMode(!cropMode);
+                      setCropArea(null);
+                    }}
+                    className={`px-3 py-1 text-sm rounded transition-colors ${
+                      cropMode
+                        ? 'bg-purple-600 text-white hover:bg-purple-700'
+                        : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                    }`}
+                  >
+                    {cropMode ? '✓ Crop Mode Active' : 'Enable Crop Mode'}
+                  </button>
+                  {cropMode && cropArea && (
+                    <button
+                      onClick={() => {
+                        // TODO: Process only cropped area
+                        alert('Crop & OCR feature coming soon!');
+                      }}
+                      className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+                    >
+                      Crop & OCR Selected Area
+                    </button>
+                  )}
+                </div>
+
+                {/* Image with navigation and crop overlay */}
+                <div
+                  className="relative overflow-auto max-h-[600px] bg-gray-100 dark:bg-gray-800 rounded"
+                  onMouseDown={(e) => {
+                    if (!cropMode || !imageRef.current) return;
+                    const rect = imageRef.current.getBoundingClientRect();
+                    setIsDragging(true);
+                    setDragStart({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+                    setCropArea(null);
+                  }}
+                  onMouseMove={(e) => {
+                    if (!cropMode || !isDragging || !dragStart || !imageRef.current) return;
+                    const rect = imageRef.current.getBoundingClientRect();
+                    const currentX = e.clientX - rect.left;
+                    const currentY = e.clientY - rect.top;
+                    setCropArea({
+                      x: Math.min(dragStart.x, currentX),
+                      y: Math.min(dragStart.y, currentY),
+                      width: Math.abs(currentX - dragStart.x),
+                      height: Math.abs(currentY - dragStart.y)
+                    });
+                  }}
+                  onMouseUp={() => setIsDragging(false)}
+                  onMouseLeave={() => setIsDragging(false)}
+                >
                   <img
+                    ref={imageRef}
                     src={currentImage.url}
                     alt={currentImage.label}
-                    className="max-h-64 mx-auto rounded border border-gray-300 dark:border-gray-600"
+                    className={`mx-auto rounded border border-gray-300 dark:border-gray-600 transition-all ${
+                      isZoomed ? 'max-w-none cursor-zoom-out' : 'max-h-[600px] cursor-zoom-in'
+                    } ${cropMode ? 'cursor-crosshair' : ''}`}
+                    onDoubleClick={() => setIsZoomed(!isZoomed)}
+                    style={isZoomed ? { width: '100%' } : {}}
                   />
 
+                  {/* Crop overlay */}
+                  {cropMode && cropArea && (
+                    <div
+                      className="absolute border-2 border-purple-600 bg-purple-600 bg-opacity-20 pointer-events-none"
+                      style={{
+                        left: cropArea.x,
+                        top: cropArea.y,
+                        width: cropArea.width,
+                        height: cropArea.height
+                      }}
+                    >
+                      <div className="absolute -top-6 left-0 bg-purple-600 text-white text-xs px-2 py-1 rounded">
+                        {Math.round(cropArea.width)} × {Math.round(cropArea.height)}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Navigation buttons */}
-                  {allImages.length > 1 && (
+                  {allImages.length > 1 && !cropMode && (
                     <>
                       <button
                         onClick={() => setCurrentImageIndex((currentImageIndex - 1 + allImages.length) % allImages.length)}
@@ -268,6 +349,13 @@ export function SimplifiedOCRUpload({ onClose, onProductsImport }: SimplifiedOCR
                     </>
                   )}
                 </div>
+
+                {/* Zoom hint */}
+                {!cropMode && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">
+                    Double-click image to zoom {isZoomed ? 'out' : 'in'}
+                  </p>
+                )}
 
                 {/* Thumbnail slider */}
                 {allImages.length > 1 && (
