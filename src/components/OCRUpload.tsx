@@ -20,6 +20,14 @@ interface OCRUploadProps {
   onViewData?: () => void;
 }
 
+interface ComparisonResult {
+  method: string;
+  text: string;
+  confidence: number;
+  productCount: number;
+  timestamp: number;
+}
+
 interface FileJob {
   id: string;
   file: File;
@@ -32,10 +40,12 @@ interface FileJob {
   ocrText?: string;
   confidence?: number;
   extractedProducts?: ParsedProduct[];
+  comparisonHistory?: ComparisonResult[];
 }
 
 type OcrEngine = 'paddleocr' | 'tesseract' | 'both';
 type TabView = 'upload' | 'history';
+type PreprocessMethod = 'auto' | 'threshold' | 'adaptive' | 'upscale' | 'all';
 
 interface HistoryScan {
   id: string;
@@ -58,6 +68,9 @@ export function OCRUpload({ onProductsExtracted, onViewData }: OCRUploadProps) {
   const [fileJobs, setFileJobs] = useState<FileJob[]>([]);
   const [clearPrevious, setClearPrevious] = useState(true);
   const [ocrEngine, setOcrEngine] = useState<OcrEngine>('paddleocr');
+  const [preprocessMethod, setPreprocessMethod] = useState<PreprocessMethod>('auto');
+  const [enableMultiResolution, setEnableMultiResolution] = useState(true);
+  const [autoProcessOnUpload, setAutoProcessOnUpload] = useState(true);
   const [historyScans, setHistoryScans] = useState<HistoryScan[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
@@ -268,7 +281,9 @@ export function OCRUpload({ onProductsExtracted, onViewData }: OCRUploadProps) {
                 nextJob.file,
                 accessToken,
                 (msg, level) => addLog(nextJob.id, msg, level),
-                ocrEngine
+                ocrEngine,
+                preprocessMethod,
+                enableMultiResolution
               );
             } catch (error) {
               // If PaddleOCR fails (e.g., 401 auth error), fall back to Tesseract
@@ -332,14 +347,47 @@ export function OCRUpload({ onProductsExtracted, onViewData }: OCRUploadProps) {
         onProductsExtracted?.(result.parsed.products);
 
         addLog(nextJob.id, `${newListings.length} products added to table`, 'success');
-        updateJobStatus(nextJob.id, {
-          status: 'completed',
+
+        const initialComparisonHistory = [{
+          method: 'Original',
+          text: result.raw_text,
+          confidence: result.confidence_score,
+          productCount: newListings.length,
+          timestamp: Date.now()
+        }];
+
+        console.log('[OCR Complete] Initializing comparison history:', {
+          jobId: nextJob.id,
+          historyLength: initialComparisonHistory.length,
+          method: initialComparisonHistory[0].method
+        });
+
+        const completedJobData = {
+          status: 'completed' as const,
           progress: 'Completed',
           productsExtracted: newListings.length,
           ocrText: result.raw_text,
           confidence: result.confidence_score,
-          extractedProducts: result.parsed.products
-        });
+          extractedProducts: result.parsed.products,
+          comparisonHistory: initialComparisonHistory
+        };
+
+        updateJobStatus(nextJob.id, completedJobData);
+
+        // Auto-process: Open results viewer immediately if enabled
+        if (autoProcessOnUpload) {
+          addLog(nextJob.id, 'Opening comparison view...', 'info');
+          // Wait for state update, then open results viewer
+          setTimeout(() => {
+            setFileJobs(currentJobs => {
+              const completedJob = currentJobs.find(j => j.id === nextJob.id);
+              if (completedJob && completedJob.preview) {
+                setSelectedJob(completedJob);
+              }
+              return currentJobs;
+            });
+          }, 100);
+        }
       } else {
         addLog(nextJob.id, 'No products found in image', 'warn');
         updateJobStatus(nextJob.id, {
@@ -445,20 +493,138 @@ export function OCRUpload({ onProductsExtracted, onViewData }: OCRUploadProps) {
           {ocrEngine === 'tesseract' && 'Uses browser-based Tesseract.js (works offline, slower)'}
           {ocrEngine === 'both' && 'Processes with both engines and shows comparison (takes longer)'}
         </p>
+
+        {/* Preprocessing Method Selector */}
+        <div className="mt-4 space-y-2">
+          <label className="text-sm font-medium text-purple-900 dark:text-purple-100 select-text">
+            Preprocessing Methods:
+          </label>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setPreprocessMethod('auto')}
+              className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
+                preprocessMethod === 'auto'
+                  ? 'bg-purple-600 text-white'
+                  : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
+              }`}
+              aria-label="Automatic preprocessing - tests all methods and chooses best"
+              data-testid="preprocess-auto-button"
+            >
+              Auto (Recommended)
+            </button>
+            <button
+              onClick={() => setPreprocessMethod('threshold')}
+              className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
+                preprocessMethod === 'threshold'
+                  ? 'bg-purple-600 text-white'
+                  : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
+              }`}
+              aria-label="Binary threshold preprocessing - best for high contrast text"
+              data-testid="preprocess-threshold-button"
+            >
+              Threshold
+            </button>
+            <button
+              onClick={() => setPreprocessMethod('adaptive')}
+              className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
+                preprocessMethod === 'adaptive'
+                  ? 'bg-purple-600 text-white'
+                  : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
+              }`}
+              aria-label="Adaptive threshold preprocessing - best for varying lighting"
+              data-testid="preprocess-adaptive-button"
+            >
+              Adaptive
+            </button>
+            <button
+              onClick={() => setPreprocessMethod('upscale')}
+              className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
+                preprocessMethod === 'upscale'
+                  ? 'bg-purple-600 text-white'
+                  : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
+              }`}
+              aria-label="Upscale preprocessing - best for small text"
+              data-testid="preprocess-upscale-button"
+            >
+              Upscale (Small Text)
+            </button>
+            <button
+              onClick={() => setPreprocessMethod('all')}
+              className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
+                preprocessMethod === 'all'
+                  ? 'bg-purple-600 text-white'
+                  : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
+              }`}
+              aria-label="Test all preprocessing methods - slowest but most thorough"
+              data-testid="preprocess-all-button"
+            >
+              All Methods
+            </button>
+          </div>
+          <p className="text-xs text-purple-700 dark:text-purple-300 mt-2 select-text">
+            {preprocessMethod === 'auto' && '✅ Backend will test multiple methods and choose the best result automatically'}
+            {preprocessMethod === 'threshold' && '📊 Binary threshold - converts image to black/white for high contrast'}
+            {preprocessMethod === 'adaptive' && '🔆 Adaptive threshold - adjusts for varying lighting conditions'}
+            {preprocessMethod === 'upscale' && '🔍 Upscales image 2x before OCR - best for small text like buttons'}
+            {preprocessMethod === 'all' && '🔬 Tests all preprocessing methods - takes longer but most accurate'}
+          </p>
+        </div>
       </div>
 
-      {/* Clear Previous Results Checkbox */}
-      <div className="flex items-center gap-2 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-        <input
-          type="checkbox"
-          id="clear-previous"
-          checked={clearPrevious}
-          onChange={(e) => setClearPrevious(e.target.checked)}
-          className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
-        />
-        <label htmlFor="clear-previous" className="text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
-          Clear previous results before adding first file (recommended to avoid duplicates)
-        </label>
+      {/* Multi-Resolution OCR Settings (only for backend) */}
+      {ocrEngine === 'paddleocr' && isAuthenticated && (
+        <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+          <h3 className="text-sm font-medium text-green-900 dark:text-green-100 mb-3">
+            🔬 Advanced OCR Settings (Backend Only)
+          </h3>
+
+          {/* Multi-Resolution Toggle */}
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="enable-multi-resolution"
+              checked={enableMultiResolution}
+              onChange={(e) => setEnableMultiResolution(e.target.checked)}
+              className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500"
+              aria-label="Enable multi-resolution OCR processing"
+              data-testid="enable-multi-resolution-checkbox"
+            />
+            <label htmlFor="enable-multi-resolution" className="text-sm text-gray-700 dark:text-gray-300 cursor-pointer select-text">
+              Enable multi-resolution processing (tests multiple image sizes)
+            </label>
+          </div>
+        </div>
+      )}
+
+      {/* Options */}
+      <div className="space-y-3">
+        {/* Auto-Process Toggle */}
+        <div className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+          <input
+            type="checkbox"
+            id="auto-process"
+            checked={autoProcessOnUpload}
+            onChange={(e) => setAutoProcessOnUpload(e.target.checked)}
+            className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 dark:focus:ring-green-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+          />
+          <label htmlFor="auto-process" className="text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+            <strong>Auto-process with all methods and show comparison immediately</strong> (recommended for quick comparison)
+          </label>
+        </div>
+
+        {/* Clear Previous Results Checkbox */}
+        <div className="flex items-center gap-2 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+          <input
+            type="checkbox"
+            id="clear-previous"
+            checked={clearPrevious}
+            onChange={(e) => setClearPrevious(e.target.checked)}
+            className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+          />
+          <label htmlFor="clear-previous" className="text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+            Clear previous results before adding first file (recommended to avoid duplicates)
+          </label>
+        </div>
       </div>
 
       {/* Upload Area */}
@@ -750,22 +916,30 @@ export function OCRUpload({ onProductsExtracted, onViewData }: OCRUploadProps) {
       )}
 
       {/* OCR Results Viewer Modal */}
-      {selectedJob && selectedJob.preview && selectedJob.ocrText && (
-        <OCRResultsViewer
-          imageUrl={selectedJob.preview}
-          ocrText={selectedJob.ocrText}
-          confidence={selectedJob.confidence || 0.8}
-          extractedProducts={(selectedJob.extractedProducts || []).map(product => ({
-            id: crypto.randomUUID(),
-            TITLE: product.name || '',
-            PRICE: product.price || 0,
-            CONDITION: (product.condition || 'New') as 'New' | 'Used - Like New' | 'Used - Good' | 'Used - Fair',
-            DESCRIPTION: product.description || '',
-            CATEGORY: product.category || '',
-            'OFFER SHIPPING': 'Yes' as 'Yes' | 'No'
-          }))}
-          onClose={() => setSelectedJob(null)}
-          onProductsImport={(products: MarketplaceListing[], options?: ImportOptions) => {
+      {selectedJob && selectedJob.preview && selectedJob.ocrText && (() => {
+        console.log('[OCRResultsViewer] Rendering with comparison history:', {
+          jobId: selectedJob.id,
+          historyLength: selectedJob.comparisonHistory?.length || 0,
+          history: selectedJob.comparisonHistory
+        });
+        return (
+          <OCRResultsViewer
+            imageUrl={selectedJob.preview}
+            ocrText={selectedJob.ocrText}
+            confidence={selectedJob.confidence || 0.8}
+            extractedProducts={(selectedJob.extractedProducts || []).map(product => ({
+              id: crypto.randomUUID(),
+              TITLE: product.name || '',
+              PRICE: product.price || 0,
+              CONDITION: (product.condition || 'New') as 'New' | 'Used - Like New' | 'Used - Good' | 'Used - Fair',
+              DESCRIPTION: product.description || '',
+              CATEGORY: product.category || '',
+              'OFFER SHIPPING': 'Yes' as 'Yes' | 'No'
+            }))}
+            comparisonHistory={selectedJob.comparisonHistory || []}
+            autoProcess={autoProcessOnUpload}
+            onClose={() => setSelectedJob(null)}
+            onProductsImport={(products: MarketplaceListing[], options?: ImportOptions) => {
             setListings((prevListings: MarketplaceListing[]) => {
               // Handle different import modes
               if (options?.mode === 'replace') {
@@ -788,12 +962,152 @@ export function OCRUpload({ onProductsExtracted, onViewData }: OCRUploadProps) {
             onViewData?.();
           }}
           onReprocess={async (processedImageUrl) => {
-            // TODO: Implement reprocessing with adjusted image
-            console.log('Reprocess with adjusted image:', processedImageUrl);
+            if (!selectedJob) {
+              console.error('[Reprocess] No selectedJob - cannot reprocess');
+              return;
+            }
+
+            console.log('[Reprocess] Starting reprocessing for job:', selectedJob.id);
+            console.log('[Reprocess] Current selectedJob state:', {
+              hasPreview: !!selectedJob.preview,
+              hasOcrText: !!selectedJob.ocrText,
+              status: selectedJob.status
+            });
+
+            try {
+              // Convert data URL to Blob
+              const response = await fetch(processedImageUrl);
+              const blob = await response.blob();
+              const file = new File([blob], selectedJob.file.name, { type: 'image/png' });
+
+              console.log('[Reprocess] Image converted to file, starting OCR...');
+
+              let result;
+
+              // Use the same OCR engine that was used originally
+              if (ocrEngine === 'tesseract' || !isAuthenticated) {
+                result = await processWithTesseract(
+                  file,
+                  () => {
+                    // Progress messages - don't update selectedJob to avoid closing modal
+                  }
+                );
+              } else {
+                // Use PaddleOCR
+                if (accessToken) {
+                  const backendHealthy = await checkBackendHealth();
+                  if (backendHealthy) {
+                    try {
+                      result = await processWithPaddleOCR(
+                        file,
+                        accessToken,
+                        () => {
+                          // Progress messages - don't update selectedJob to avoid closing modal
+                        },
+                        ocrEngine,
+                        preprocessMethod,
+                        enableMultiResolution
+                      );
+                    } catch {
+                      result = await processWithTesseract(
+                        file,
+                        () => {
+                          // Progress messages - don't update selectedJob to avoid closing modal
+                        }
+                      );
+                    }
+                  } else {
+                    result = await processWithTesseract(
+                      file,
+                      () => {
+                        // Progress messages - don't update selectedJob to avoid closing modal
+                      }
+                    );
+                  }
+                }
+              }
+
+              if (result) {
+                console.log('[Reprocess] OCR complete, updating results:', {
+                  textLength: result.text.length,
+                  confidence: result.confidence,
+                  productCount: result.parsed.products.length
+                });
+
+                // Create new comparison result
+                const newComparisonResult: ComparisonResult = {
+                  method: `Reprocessed #${(selectedJob.comparisonHistory?.length || 0) + 1}`,
+                  text: result.text,
+                  confidence: result.confidence,
+                  productCount: result.parsed.products.length,
+                  timestamp: Date.now()
+                };
+
+                // Update BOTH the job in fileJobs array AND selectedJob
+                const updatedJobData = {
+                  status: 'completed' as const,
+                  progress: 'Reprocessing complete',
+                  ocrText: result.text,
+                  confidence: result.confidence,
+                  extractedProducts: result.parsed.products,
+                  productsExtracted: result.parsed.products.length,
+                  preview: processedImageUrl,
+                  comparisonHistory: [...(selectedJob.comparisonHistory || []), newComparisonResult],
+                };
+
+                // Update job in fileJobs array
+                updateJobStatus(selectedJob.id, updatedJobData);
+                addLog(selectedJob.id, `Reprocessing complete! Found ${result.parsed.products.length} products`, 'success');
+
+                // Update selectedJob to show new results in modal immediately
+                setSelectedJob(prev => {
+                  if (!prev) {
+                    console.error('[Reprocess] prev is null, cannot update selectedJob!');
+                    return null;
+                  }
+                  console.log('[Reprocess] Updating selectedJob with new data');
+                  console.log('[Reprocess] Comparison history now has', updatedJobData.comparisonHistory.length, 'results');
+
+                  return {
+                    ...prev,
+                    ...updatedJobData,
+                  };
+                });
+              } else {
+                console.error('[Reprocess] No OCR result returned');
+                throw new Error('No OCR result returned');
+              }
+            } catch (error) {
+              const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+              console.error('[Reprocess] Error during reprocessing:', errorMsg, error);
+
+              // Update BOTH the job in fileJobs array AND selectedJob
+              const errorData = {
+                status: 'error' as const,
+                progress: 'Reprocessing failed',
+                error: errorMsg,
+              };
+
+              updateJobStatus(selectedJob.id, errorData);
+              addLog(selectedJob.id, `Reprocessing failed: ${errorMsg}`, 'error');
+
+              setSelectedJob(prev => {
+                if (!prev) {
+                  console.error('[Reprocess] prev is null in error handler!');
+                  return null;
+                }
+                console.log('[Reprocess] Updating selectedJob with error state');
+                return {
+                  ...prev,
+                  ...errorData,
+                };
+              });
+            }
           }}
           currentRowCount={listings.length}
-        />
-      )}
+          />
+        );
+      })()}
     </div>
   );
 }

@@ -2,14 +2,13 @@ import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { FileUpload } from './components/FileUpload';
 import { DataTable } from './components/DataTable';
 import { ExportButton } from './components/ExportButton';
-import { BackendStatus } from './components/BackendStatus';
 import { AuthModal } from './components/AuthModal';
 import { UserMenu } from './components/UserMenu';
 import { MobileMenu } from './components/MobileMenu';
 import { UserSettings } from './components/UserSettings';
 import { AdminPanel } from './components/AdminPanel';
 import { SyncStatus } from './components/SyncStatus';
-import { OCRUpload } from './components/OCRUpload';
+import { SimplifiedOCRUpload } from './components/SimplifiedOCRUpload';
 import { ExportTabs } from './components/ExportTabs';
 import { TemplateManager } from './components/TemplateManager';
 import { SaveTemplateModal } from './components/SaveTemplateModal';
@@ -266,11 +265,10 @@ function App() {
       {/* Header */}
       <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-10 transition-colors">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
-          {/* Single Row: Backend Status, Sync Status, User Controls, Hamburger Menu */}
+          {/* Single Row: Sync Status, User Controls, Hamburger Menu */}
           <div className="flex items-center justify-between gap-4">
-            {/* Left: Backend Status and Sync Status */}
+            {/* Left: Sync Status */}
             <div className="flex items-center gap-4 flex-1">
-              <BackendStatus />
               {isAuthenticated && <SyncStatus />}
             </div>
 
@@ -486,34 +484,20 @@ function App() {
 
       {/* OCR Upload Modal */}
       {showOCRUpload && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" id="ocr-upload-section">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">OCR Image Upload</h2>
-                <button
-                  onClick={() => setShowOCRUpload(false)}
-                  aria-label="Close OCR upload modal"
-                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                >
-                  ✕
-                </button>
-              </div>
-              <OCRUpload
-                onViewData={() => {
-                  setShowOCRUpload(false);
-                  setTimeout(() => {
-                    const el = document.getElementById('main-content');
-                    if (el) {
-                      const y = el.getBoundingClientRect().top + window.pageYOffset - 100;
-                      window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
-                    }
-                  }, 100);
-                }}
-              />
-            </div>
-          </div>
-        </div>
+        <SimplifiedOCRUpload
+          onClose={() => setShowOCRUpload(false)}
+          onProductsImport={(products) => {
+            setListings(products);
+            setShowOCRUpload(false);
+            setTimeout(() => {
+              const el = document.getElementById('main-content');
+              if (el) {
+                const y = el.getBoundingClientRect().top + window.pageYOffset - 100;
+                window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
+              }
+            }, 100);
+          }}
+        />
       )}
 
       {/* Template Manager Modal */}

@@ -3,48 +3,62 @@
  * View and edit OCR results with image preview and text editing
  */
 
-import { useState } from 'react';
-import { X, Image as ImageIcon, FileText, Download, CheckCircle, Edit3, Plus, RefreshCw, ArrowDown } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { X, Image as ImageIcon, FileText, Download, CheckCircle, Edit3, Plus, RefreshCw, ArrowDown, Loader } from 'lucide-react';
 import { ImagePreprocessor } from './ImagePreprocessor';
 import { OCRTextEditor } from './OCRTextEditor';
 import { OCRScratchPad } from './OCRScratchPad';
-import type { MarketplaceListing } from '../types';
-
-export interface ImportOptions {
-  mode: 'append' | 'replace' | 'insert';
-  insertAtRow?: number;
-}
+import { CompareMethodsView } from './CompareMethodsView';
+import type { MarketplaceListing, ComparisonResult, ImportOptions } from '../types';
 
 interface OCRResultsViewerProps {
   imageUrl: string;
   ocrText: string;
   confidence: number;
   extractedProducts?: MarketplaceListing[];
+  comparisonHistory?: ComparisonResult[];
   onClose: () => void;
   onProductsImport?: (products: MarketplaceListing[], options?: ImportOptions) => void;
-  onReprocess?: (processedImageUrl: string) => void;
+  onReprocess?: (processedImageUrl: string) => Promise<void>;
   currentRowCount?: number;
+  isReprocessing?: boolean;
+  autoProcess?: boolean; // If true, auto-switch to compare tab and process all methods
 }
 
-type ViewMode = 'image' | 'text' | 'products' | 'scratch';
+type ViewMode = 'image' | 'text' | 'products' | 'scratch' | 'compare';
 
 export function OCRResultsViewer({
   imageUrl,
   ocrText,
   confidence,
   extractedProducts = [],
+  comparisonHistory = [],
   onClose,
   onProductsImport,
   onReprocess,
-  currentRowCount = 0
+  currentRowCount = 0,
+  isReprocessing: _isReprocessing = false,
+  autoProcess = false
 }: OCRResultsViewerProps) {
-  const [viewMode, setViewMode] = useState<ViewMode>('text');
+  const [viewMode, setViewMode] = useState<ViewMode>(autoProcess ? 'compare' : 'text');
   const [editedText, setEditedText] = useState(ocrText);
   const [selectedProducts, setSelectedProducts] = useState<Set<number>>(
     new Set(extractedProducts.map((_, idx) => idx)) // Select all by default
   );
   const [importMode, setImportMode] = useState<'append' | 'replace' | 'insert'>('append');
   const [insertAtRow, setInsertAtRow] = useState(1);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [preprocessedImageUrl, setPreprocessedImageUrl] = useState<string | null>(null);
+
+  // Update editedText when ocrText prop changes (e.g., after reprocessing)
+  useEffect(() => {
+    setEditedText(ocrText);
+  }, [ocrText]);
+
+  // Update selectedProducts when extractedProducts prop changes (e.g., after reprocessing)
+  useEffect(() => {
+    setSelectedProducts(new Set(extractedProducts.map((_, idx) => idx)));
+  }, [extractedProducts]);
 
   const toggleProductSelection = (idx: number) => {
     setSelectedProducts(prev => {
@@ -90,7 +104,24 @@ export function OCRResultsViewer({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col relative">
+        {/* Loading Overlay */}
+        {isProcessing && (
+          <div className="absolute inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 rounded-lg">
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-xl flex flex-col items-center gap-4">
+              <Loader size={48} className="animate-spin text-blue-600 dark:text-blue-400" />
+              <div className="text-center">
+                <p className="text-lg font-medium text-gray-900 dark:text-white">
+                  Reprocessing Image...
+                </p>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  Running OCR with adjusted preprocessing
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
           <div>
@@ -156,6 +187,19 @@ export function OCRResultsViewer({
             <Edit3 size={16} />
             Scratch Pad
           </button>
+          {onReprocess && (
+            <button
+              onClick={() => setViewMode('compare')}
+              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
+                viewMode === 'compare'
+                  ? 'bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 border-t border-l border-r border-gray-200 dark:border-gray-700'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+              }`}
+            >
+              <RefreshCw size={16} />
+              Compare Methods
+            </button>
+          )}
         </div>
 
         {/* Content */}
@@ -317,7 +361,30 @@ export function OCRResultsViewer({
           {viewMode === 'image' && (
             <ImagePreprocessor
               imageUrl={imageUrl}
-              onImageProcessed={onReprocess}
+              onImageProcessed={onReprocess ? async (processedImageUrl) => {
+                setIsProcessing(true);
+                setPreprocessedImageUrl(processedImageUrl); // Store for comparison slider
+                try {
+                  await onReprocess(processedImageUrl);
+                } finally {
+                  setIsProcessing(false);
+                }
+              } : undefined}
+              onBatchProcess={onReprocess ? async (methods: string[]) => {
+                setIsProcessing(true);
+                try {
+                  // Process each method sequentially
+                  for (const method of methods) {
+                    // TODO: Call backend API to process with specific method
+                    // For now, just simulate processing
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                  }
+                  // After all methods processed, switch to Compare tab
+                  setViewMode('compare');
+                } finally {
+                  setIsProcessing(false);
+                }
+              } : undefined}
             />
           )}
 
@@ -325,6 +392,13 @@ export function OCRResultsViewer({
             <OCRScratchPad
               initialText={ocrText}
               onProductsCreate={onProductsImport}
+            />
+          )}
+
+          {viewMode === 'compare' && (
+            <CompareMethodsView
+              comparisonHistory={comparisonHistory}
+              originalImageUrl={imageUrl}
             />
           )}
         </div>

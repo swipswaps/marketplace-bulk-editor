@@ -14,7 +14,7 @@ from schemas.ocr_schema import OCRScanSchema, OCRUploadSchema, OCRCorrectionSche
 from utils.auth import token_required
 from utils.file_upload import save_upload_file, delete_upload_file
 from utils.audit import log_action
-from utils.ocr_processor import process_with_paddleocr, parse_product_catalog
+from utils.ocr_processor import process_with_paddleocr, parse_product_catalog, process_image_multi_method
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +41,12 @@ def upload_file(current_user):
     # Get optional OCR engine parameter (paddleocr, tesseract, both)
     ocr_engine = request.form.get('ocr_engine', 'paddleocr')
 
+    # Get optional preprocessing parameters
+    preprocess_method = request.form.get('preprocess_method', 'auto')
+    multi_resolution = request.form.get('multi_resolution', 'true').lower() == 'true'
+
+    logger.info(f"OCR parameters: engine={ocr_engine}, preprocess={preprocess_method}, multi_resolution={multi_resolution}")
+
     try:
         # Save file
         file_path = save_upload_file(file, 'ocr')
@@ -66,12 +72,30 @@ def upload_file(current_user):
 
         # Process OCR immediately
         try:
-            logger.info(f"Processing OCR for {file.filename} (scan_id={ocr_scan.id})")
+            logger.info(f"Processing OCR for {file.filename} (scan_id={ocr_scan.id}, engine={ocr_engine})")
 
             start_time = time.time()
 
-            # Process with PaddleOCR directly (receipts-ocr pattern)
-            raw_text, confidence, blocks = process_with_paddleocr(file_path)
+            # Use improved multi-method processing with Tesseract fallback
+            # This tests multiple preprocessing methods and PSM modes
+            temp_dir = tempfile.mkdtemp()
+            try:
+                result = process_image_multi_method(
+                    file_path,
+                    temp_dir,
+                    preprocess_method=preprocess_method,
+                    multi_resolution=multi_resolution
+                )
+                raw_text = result['raw_text']
+                confidence = result['confidence']
+                blocks = result.get('blocks', [])
+                method_used = result['method']
+
+                logger.info(f"OCR completed using method: {method_used} (preprocess={preprocess_method}, multi_res={multi_resolution})")
+            finally:
+                # Clean up temp directory
+                import shutil
+                shutil.rmtree(temp_dir, ignore_errors=True)
 
             processing_time = time.time() - start_time
 

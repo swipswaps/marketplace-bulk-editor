@@ -50,3 +50,18 @@ export interface ImportValidationResult {
   autoFilledCount: number;
   rejectedCount: number;
 }
+
+export interface ComparisonResult {
+  method: string;
+  text: string;
+  confidence: number;
+  productCount: number;
+  timestamp?: number;
+  products?: any[]; // ParsedProduct[] from OCR
+  preprocessedImageUrl?: string; // URL of preprocessed image for slider comparison
+}
+
+export interface ImportOptions {
+  mode: 'append' | 'replace' | 'insert';
+  insertAtRow?: number;
+}

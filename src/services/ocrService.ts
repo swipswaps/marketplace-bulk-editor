@@ -58,7 +58,9 @@ export const processWithPaddleOCR = async (
   file: File,
   accessToken: string,
   onLog?: LogFn,
-  ocrEngine?: string
+  ocrEngine?: string,
+  preprocessMethod?: string,
+  enableMultiResolution?: boolean
 ): Promise<OcrResponse> => {
   onLog?.('Sending to PaddleOCR backend...', 'info');
 
@@ -66,6 +68,16 @@ export const processWithPaddleOCR = async (
   formData.append('file', file);
   if (ocrEngine) {
     formData.append('ocr_engine', ocrEngine);
+  }
+  if (preprocessMethod) {
+    formData.append('preprocess_method', preprocessMethod);
+    onLog?.(`Using preprocessing method: ${preprocessMethod}`, 'info');
+  }
+  if (enableMultiResolution !== undefined) {
+    formData.append('multi_resolution', enableMultiResolution.toString());
+    if (enableMultiResolution) {
+      onLog?.('Multi-resolution processing enabled - testing multiple image sizes', 'info');
+    }
   }
 
   onLog?.('Waiting for PaddleOCR response (this may take up to 60 seconds)...', 'info');
@@ -131,8 +143,8 @@ export const processWithPaddleOCR = async (
  * - Adaptive thresholding for better text separation
  * - Noise reduction
  */
-const preprocessImageForOCR = async (file: File, onLog?: LogFn): Promise<string> => {
-  onLog?.('Preprocessing image for OCR (3x scale, enhanced contrast, adaptive threshold)...', 'info');
+const preprocessImageForOCR = async (file: File, method: string = 'auto', onLog?: LogFn): Promise<string> => {
+  onLog?.(`Preprocessing image with method: ${method}...`, 'info');
 
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -145,8 +157,32 @@ const preprocessImageForOCR = async (file: File, onLog?: LogFn): Promise<string>
         return;
       }
 
-      // Scale up 3x for better OCR accuracy (was 2x)
-      const scaleFactor = 3;
+      // Different preprocessing based on method
+      let scaleFactor = 3;
+
+      switch (method) {
+        case 'grayscale':
+          scaleFactor = 1; // No upscaling, just grayscale
+          break;
+        case 'threshold':
+          scaleFactor = 2; // Moderate upscaling with binary threshold
+          break;
+        case 'adaptive':
+          scaleFactor = 2; // Moderate upscaling with adaptive threshold
+          break;
+        case 'denoise':
+          scaleFactor = 2; // Moderate upscaling with noise reduction
+          break;
+        case 'sharpen':
+          scaleFactor = 2; // Moderate upscaling with sharpening
+          break;
+        case 'upscale':
+          scaleFactor = 4; // Maximum upscaling
+          break;
+        default:
+          scaleFactor = 3; // Auto - balanced approach
+      }
+
       canvas.width = img.width * scaleFactor;
       canvas.height = img.height * scaleFactor;
 
@@ -161,34 +197,104 @@ const preprocessImageForOCR = async (file: File, onLog?: LogFn): Promise<string>
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const data = imageData.data;
 
-      // First pass: Convert to grayscale
-      const grayData = new Uint8ClampedArray(canvas.width * canvas.height);
-      for (let i = 0; i < data.length; i += 4) {
-        const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-        grayData[i / 4] = gray;
-      }
+      // Apply method-specific processing
+      if (method === 'grayscale') {
+        // Just grayscale, no other processing
+        for (let i = 0; i < data.length; i += 4) {
+          const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+          data[i] = data[i + 1] = data[i + 2] = gray;
+        }
+      } else if (method === 'threshold') {
+        // Binary threshold with fixed value
+        for (let i = 0; i < data.length; i += 4) {
+          const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+          const binary = gray > 128 ? 255 : 0;
+          data[i] = data[i + 1] = data[i + 2] = binary;
+        }
+      } else if (method === 'adaptive' || method === 'auto') {
+        // Adaptive threshold using Otsu's method
+        const grayData = new Uint8ClampedArray(canvas.width * canvas.height);
+        for (let i = 0; i < data.length; i += 4) {
+          const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+          grayData[i / 4] = gray;
+        }
 
-      // Second pass: Enhanced contrast (factor 2.0 instead of 1.5)
-      const contrast = 2.0;
-      for (let i = 0; i < grayData.length; i++) {
-        const enhanced = ((grayData[i] / 255 - 0.5) * contrast + 0.5) * 255;
-        grayData[i] = Math.max(0, Math.min(255, enhanced));
-      }
+        // Enhanced contrast
+        const contrast = 2.0;
+        for (let i = 0; i < grayData.length; i++) {
+          const enhanced = ((grayData[i] / 255 - 0.5) * contrast + 0.5) * 255;
+          grayData[i] = Math.max(0, Math.min(255, enhanced));
+        }
 
-      // Third pass: Adaptive thresholding for better text separation
-      // Use Otsu's method approximation
-      const threshold = calculateOtsuThreshold(grayData);
-      onLog?.(`Calculated threshold: ${threshold}`, 'info');
+        // Calculate and apply adaptive threshold
+        const threshold = calculateOtsuThreshold(grayData);
+        onLog?.(`Calculated threshold: ${threshold}`, 'info');
 
-      // Apply threshold
-      for (let i = 0; i < data.length; i += 4) {
-        const gray = grayData[i / 4];
-        const binary = gray > threshold ? 255 : 0;
+        for (let i = 0; i < data.length; i += 4) {
+          const gray = grayData[i / 4];
+          const binary = gray > threshold ? 255 : 0;
+          data[i] = data[i + 1] = data[i + 2] = binary;
+        }
+      } else if (method === 'denoise') {
+        // Grayscale with median filter for noise reduction
+        const grayData = new Uint8ClampedArray(canvas.width * canvas.height);
+        for (let i = 0; i < data.length; i += 4) {
+          const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+          grayData[i / 4] = gray;
+        }
 
-        data[i] = binary;     // R
-        data[i + 1] = binary; // G
-        data[i + 2] = binary; // B
-        // Alpha unchanged
+        // Simple 3x3 median filter
+        const filtered = new Uint8ClampedArray(grayData.length);
+        for (let y = 1; y < canvas.height - 1; y++) {
+          for (let x = 1; x < canvas.width - 1; x++) {
+            const neighbors = [];
+            for (let dy = -1; dy <= 1; dy++) {
+              for (let dx = -1; dx <= 1; dx++) {
+                neighbors.push(grayData[(y + dy) * canvas.width + (x + dx)]);
+              }
+            }
+            neighbors.sort((a, b) => a - b);
+            filtered[y * canvas.width + x] = neighbors[4]; // median
+          }
+        }
+
+        for (let i = 0; i < data.length; i += 4) {
+          const gray = filtered[i / 4];
+          data[i] = data[i + 1] = data[i + 2] = gray;
+        }
+      } else if (method === 'sharpen') {
+        // Grayscale with sharpening
+        const grayData = new Uint8ClampedArray(canvas.width * canvas.height);
+        for (let i = 0; i < data.length; i += 4) {
+          const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+          grayData[i / 4] = gray;
+        }
+
+        // Sharpening kernel
+        const sharpened = new Uint8ClampedArray(grayData.length);
+        for (let y = 1; y < canvas.height - 1; y++) {
+          for (let x = 1; x < canvas.width - 1; x++) {
+            const idx = y * canvas.width + x;
+            const value =
+              grayData[idx] * 5 -
+              grayData[idx - 1] -
+              grayData[idx + 1] -
+              grayData[idx - canvas.width] -
+              grayData[idx + canvas.width];
+            sharpened[idx] = Math.max(0, Math.min(255, value));
+          }
+        }
+
+        for (let i = 0; i < data.length; i += 4) {
+          const gray = sharpened[i / 4];
+          data[i] = data[i + 1] = data[i + 2] = gray;
+        }
+      } else if (method === 'upscale') {
+        // Just upscale, minimal processing
+        for (let i = 0; i < data.length; i += 4) {
+          const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+          data[i] = data[i + 1] = data[i + 2] = gray;
+        }
       }
 
       ctx.putImageData(imageData, 0, 0);
@@ -262,12 +368,13 @@ function calculateOtsuThreshold(grayData: Uint8ClampedArray): number {
  */
 export const processWithTesseract = async (
   file: File,
-  onLog?: LogFn
+  onLog?: LogFn,
+  preprocessMethod: string = 'auto'
 ): Promise<OcrResponse> => {
   onLog?.('Processing with Tesseract.js (browser fallback)...', 'info');
 
-  // Preprocess image for better OCR
-  const preprocessedImage = await preprocessImageForOCR(file, onLog);
+  // Preprocess image for better OCR with specified method
+  const preprocessedImage = await preprocessImageForOCR(file, preprocessMethod, onLog);
 
   // Tesseract.js will be loaded dynamically
   const { createWorker } = await import('tesseract.js');
@@ -312,7 +419,8 @@ export const processWithTesseract = async (
     filename: file.name,
     raw_text: text,
     parsed: { products },
-    confidence_score: result.data.confidence / 100
+    confidence_score: result.data.confidence / 100,
+    preprocessed_image_url: preprocessedImage // Return preprocessed image for preview
   };
 };
 

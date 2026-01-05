@@ -1,19 +1,13 @@
 ---
 type: "always_apply"
-description: "Mandatory rules for all AI assistant interactions - workflow patterns, evidence requirements, evidence persistence, and critical constraints"
+description: "Mandatory rules for all AI assistant interactions - workflow patterns, evidence requirements, and critical constraints"
 ---
 
 # Mandatory Rules for AI Assistant Interactions
 
-Version: 6.0 (Enforced - Request Compliance Upgrade)
+Version: 5.2 (Enforced)
 Status: Authoritative
 Scope: Overrides all default assistant behavior
-
-CHANGELOG v6.0 (2026-01-02):
-- Rule 0: Enhanced with BEFORE/AFTER state capture requirement
-- Rule 2: Upgraded to CRITICAL with evidence persistence requirements
-- Rule 39: NEW - Evidence Persistence (all evidence saved to files)
-- Rule 40: NEW - No Excuses, Find a Way (solution-oriented responses)
 
 ============================================================
 RULE CLASSES (READ FIRST)
@@ -294,10 +288,65 @@ Use xdotool + xprop command exactly as specified.
 No new browser instances if existing window exists.
 
 ============================================================
-RULE 27 — Screenshot Claims Require OCR 🟠
+RULE 27 — Screenshot Claims Require OCR (CRITICAL) 🔴
 ============================================================
 
-No visual claims without OCR text and screenshot display.
+**NEVER make claims about what a screenshot shows without:**
+
+1. ✅ **SCROLL to target elements** - Use `scrollIntoView()` to ensure elements are visible
+2. ✅ **VERIFY elements are displayed** - Check `is_displayed()` returns True
+3. ✅ **Take screenshot AFTER scrolling** - Don't screenshot before elements are visible
+4. ✅ **Run OCR on the screenshot** - Use Tesseract or PaddleOCR
+5. ✅ **Show FULL OCR output** - Don't summarize, show complete text
+6. ✅ **Display screenshot to user** - Use `code /tmp/screenshot.png` in VSCode
+7. ✅ **Base claims ONLY on OCR text** - Not on assumptions or guesses
+
+**Forbidden phrases without OCR evidence:**
+- ❌ "I can see..."
+- ❌ "The screenshot shows..."
+- ❌ "Looking at the screenshot..."
+- ❌ "The fix appears to be working..."
+- ❌ "The problem is fixed..."
+- ❌ "The buttons are visible..." (without OCR proof)
+
+**Required pattern for Selenium + OCR:**
+```python
+# 1. Find target element by data-testid or aria-label
+target = driver.find_element(By.CSS_SELECTOR, "[data-testid='target-element']")
+
+# 2. SCROLL to make element visible
+driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", target)
+time.sleep(1)
+
+# 3. VERIFY element is displayed
+assert target.is_displayed(), "Element not visible after scrolling!"
+
+# 4. Take screenshot
+driver.save_screenshot("/tmp/screenshot.png")
+
+# 5. Run OCR
+import pytesseract
+from PIL import Image
+img = Image.open('/tmp/screenshot.png')
+text = pytesseract.image_to_string(img)
+print("=== FULL OCR OUTPUT ===")
+print(text)
+
+# 6. Display screenshot to user
+# (In VSCode: code /tmp/screenshot.png)
+
+# 7. Make claims based ONLY on OCR output
+if "Expected Text" in text:
+    print("✅ Found 'Expected Text' in OCR output")
+else:
+    print("❌ 'Expected Text' NOT found in OCR output")
+```
+
+**Why this rule exists:**
+- Prevents claiming buttons are visible when they're below the fold
+- Prevents running OCR on screenshots that don't show target elements
+- Prevents false negatives (element exists but not in screenshot)
+- Ensures reproducible verification
 
 ============================================================
 RULE 28 — Application Parameters Database 🟠
@@ -383,81 +432,6 @@ Any violation MUST be:
 - Logged
 - Cited by rule number
 - Referenced before next step
-
-============================================================
-RULE 39 — Evidence Persistence (NEW) 🔴
-============================================================
-
-ALL evidence must be saved to files for user verification.
-
-MANDATORY WORKFLOW:
-
-1. BEFORE any action:
-   - Capture current state
-   - Save to /tmp/before_[action]_[timestamp].txt
-
-2. DURING action:
-   - Save all command output to /tmp/[action]_output.txt
-   - Use `tee` to show AND save simultaneously
-
-3. AFTER action:
-   - Capture new state
-   - Save to /tmp/after_[action]_[timestamp].txt
-
-4. COMPARISON:
-   - Create /tmp/[action]_comparison.txt showing before/after diff
-
-REQUIRED FILE NAMING:
-- /tmp/errors_before_YYYYMMDD_HHMMSS.txt
-- /tmp/errors_after_YYYYMMDD_HHMMSS.txt
-- /tmp/build_output_YYYYMMDD_HHMMSS.txt
-- /tmp/screenshot_YYYYMMDD_HHMMSS.png
-
-FORBIDDEN:
-- Showing output without saving to file
-- Claiming "evidence shown" without file path
-- Deleting evidence files before user confirms
-
-============================================================
-RULE 40 — No Excuses, Find a Way (NEW) 🔴
-============================================================
-
-When user requests evidence, NEVER claim it's impossible.
-
-FORBIDDEN RESPONSES:
-- "I cannot prove it now because..."
-- "The errors are already fixed so..."
-- "I don't have access to..."
-- "It's too late to..."
-
-REQUIRED APPROACH:
-
-1. ACKNOWLEDGE THE REQUEST
-   - "You asked for [specific evidence]"
-
-2. PROPOSE SOLUTION
-   - "I can obtain this by [method]"
-   - Example: "I can stash changes, capture errors, then restore"
-
-3. ASK FOR PERMISSION IF RISKY
-   - "This requires [action]. May I proceed?"
-
-4. EXECUTE AND PROVIDE EVIDENCE
-   - Show the evidence in the format requested
-   - Save to files per Rule 37
-
-EXAMPLES:
-
-❌ WRONG:
-"I cannot show the original 40 errors because I already fixed them."
-
-✅ CORRECT:
-"You asked for the original error list. I can:
-1. Stash my current changes
-2. Run build to capture all errors
-3. Save to /tmp/errors_before.txt
-4. Restore my changes
-May I proceed?"
 
 ============================================================
 FINAL STEP — Compliance Self-Audit 🔴

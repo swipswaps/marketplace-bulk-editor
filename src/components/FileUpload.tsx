@@ -565,13 +565,14 @@ export function FileUpload({ onDataLoaded, onTemplateDetected, currentTemplate, 
       <>
         <div className="flex items-center gap-2">
           <div {...getRootProps()}>
-            <input {...getInputProps()} />
+            <input {...getInputProps()} aria-label="Upload additional Excel file for marketplace listings" data-testid="file-upload-input-compact" />
             <button
               className="p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
               title="Import More - Upload additional files"
               aria-label="Import More - Upload additional files"
+              data-testid="file-upload-button-compact"
             >
-              <Upload size={20} />
+              <Upload size={20} aria-hidden="true" />
             </button>
           </div>
 

@@ -1,0 +1,445 @@
+/**
+ * Simplified OCR Upload Component
+ * Single-view UX: Upload → Select Methods → Process → Compare Results
+ * Per Rule 16: Simplified workflow while preserving functionality
+ */
+
+import { useState, useRef } from 'react';
+import { FileImage, Loader, CheckCircle, X } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import { processWithTesseract, processWithPaddleOCR, checkBackendHealth } from '../services/ocrService';
+import type { ParsedProduct } from '../types/ocr';
+import type { MarketplaceListing } from '../types';
+
+interface SimplifiedOCRUploadProps {
+  onClose: () => void;
+  onProductsImport?: (products: MarketplaceListing[]) => void;
+}
+
+interface ProcessingResult {
+  method: string;
+  text: string;
+  confidence: number;
+  productCount: number;
+  products: ParsedProduct[];
+  preprocessedImageUrl?: string; // Preview of preprocessed image
+}
+
+type PreprocessMethod = 'grayscale' | 'threshold' | 'adaptive' | 'denoise' | 'sharpen' | 'upscale';
+
+export function SimplifiedOCRUpload({ onClose, onProductsImport }: SimplifiedOCRUploadProps) {
+  const { isAuthenticated, accessToken } = useAuth();
+  const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [selectedMethods, setSelectedMethods] = useState<Set<PreprocessMethod>>(
+    new Set(['grayscale', 'threshold', 'adaptive', 'denoise', 'sharpen'])
+  );
+  const [isProcessing, setIsProcessing] = useState(false);
+  const isCancelledRef = useRef(false); // Use ref for immediate cancellation
+  const [results, setResults] = useState<ProcessingResult[]>([]);
+  const [processingProgress, setProcessingProgress] = useState('');
+  const [ocrEngine, setOcrEngine] = useState<'paddleocr' | 'tesseract'>('paddleocr');
+  // Show warning immediately if PaddleOCR selected and not authenticated
+  const [showLoginWarning, setShowLoginWarning] = useState(!isAuthenticated);
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadedFile(file);
+    
+    // Create preview
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setUploadedImage(e.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+    
+    // Reset results
+    setResults([]);
+  };
+
+  const toggleMethod = (method: PreprocessMethod) => {
+    setSelectedMethods(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(method)) {
+        newSet.delete(method);
+      } else {
+        newSet.add(method);
+      }
+      return newSet;
+    });
+  };
+
+  const processAllMethods = async () => {
+    if (!uploadedFile) return;
+
+    setIsProcessing(true);
+    isCancelledRef.current = false; // Reset cancel flag
+    setResults([]);
+    const newResults: ProcessingResult[] = [];
+
+    try {
+      // Determine which OCR engine to use
+      const usePaddleOCR = ocrEngine === 'paddleocr' && isAuthenticated && accessToken;
+
+      if (usePaddleOCR) {
+        // Check backend health
+        const backendHealthy = await checkBackendHealth();
+        if (!backendHealthy) {
+          setProcessingProgress('Backend unavailable, falling back to Tesseract...');
+          setOcrEngine('tesseract');
+        }
+      }
+
+      // Process with each selected method
+      for (const method of Array.from(selectedMethods)) {
+        // Check if cancelled
+        if (isCancelledRef.current) {
+          setProcessingProgress('Processing cancelled by user');
+          break;
+        }
+
+        setProcessingProgress(`Processing with ${method}...`);
+
+        let result;
+
+        if (usePaddleOCR && accessToken) {
+          try {
+            result = await processWithPaddleOCR(
+              uploadedFile,
+              accessToken,
+              (msg) => setProcessingProgress(msg),
+              'paddleocr',
+              method === 'threshold' ? 'threshold' :
+              method === 'adaptive' ? 'adaptive' :
+              method === 'upscale' ? 'upscale' : 'auto',
+              true // enableMultiResolution
+            );
+          } catch (error) {
+            console.error(`PaddleOCR failed for ${method}, falling back to Tesseract:`, error);
+            result = await processWithTesseract(
+              uploadedFile,
+              (msg) => setProcessingProgress(msg),
+              method
+            );
+          }
+        } else {
+          result = await processWithTesseract(
+            uploadedFile,
+            (msg) => setProcessingProgress(msg),
+            method
+          );
+        }
+
+        if (result.success) {
+          const newResult = {
+            method,
+            text: result.raw_text,
+            confidence: result.confidence_score || 0,
+            productCount: result.parsed.products.length,
+            products: result.parsed.products,
+            preprocessedImageUrl: result.preprocessed_image_url
+          };
+          newResults.push(newResult);
+
+          // Update results immediately so partial results are visible
+          setResults([...newResults]);
+        }
+      }
+
+      setResults(newResults);
+      setProcessingProgress('');
+    } catch (error) {
+      console.error('Processing error:', error);
+      setProcessingProgress('Error processing image');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+
+
+  const methodLabels: Record<PreprocessMethod, string> = {
+    grayscale: 'Grayscale',
+    threshold: 'Threshold',
+    adaptive: 'Adaptive Threshold',
+    denoise: 'Denoise',
+    sharpen: 'Sharpen',
+    upscale: 'Upscale'
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="p-6">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">OCR Image Upload</h2>
+            <button
+              onClick={onClose}
+              aria-label="Close OCR upload"
+              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+            >
+              <X size={24} />
+            </button>
+          </div>
+
+          {/* Upload Area */}
+          {!uploadedImage && (
+            <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-8 mb-6">
+              <label className="flex flex-col items-center cursor-pointer">
+                <FileImage size={48} className="text-gray-400 dark:text-gray-500 mb-2" />
+                <span className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                  Upload product catalog image
+                </span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                />
+                <span className="text-xs text-gray-500 dark:text-gray-500">
+                  Click to browse or drag and drop
+                </span>
+              </label>
+            </div>
+          )}
+
+          {/* Image Preview + Method Selector + Results */}
+          {uploadedImage && (
+            <div className="space-y-6">
+              {/* Image Preview - Clickable */}
+              <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">Image Preview</h3>
+                  <a
+                    href={uploadedImage}
+                    download={uploadedFile?.name || 'uploaded-image.png'}
+                    className="text-xs text-purple-600 dark:text-purple-400 hover:underline"
+                    title="Download original image"
+                  >
+                    📥 Download Original
+                  </a>
+                </div>
+                <a
+                  href={uploadedImage}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block cursor-pointer hover:opacity-80 transition-opacity"
+                  title="Click to open full image in new tab"
+                >
+                  <img src={uploadedImage} alt="Uploaded" className="max-h-64 mx-auto rounded border border-gray-300 dark:border-gray-600" />
+                </a>
+              </div>
+
+              {/* OCR Engine Selector */}
+              <div className="bg-white dark:bg-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
+                <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-3">
+                  OCR Engine:
+                </h3>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="ocr-engine"
+                      value="paddleocr"
+                      checked={ocrEngine === 'paddleocr'}
+                      onChange={(e) => {
+                        setOcrEngine(e.target.value as 'paddleocr' | 'tesseract');
+                        if (!isAuthenticated) {
+                          setShowLoginWarning(true);
+                        } else {
+                          setShowLoginWarning(false);
+                        }
+                      }}
+                      className="w-4 h-4 text-purple-600 bg-gray-100 border-gray-300 focus:ring-purple-500"
+                    />
+                    <span className="text-sm text-gray-700 dark:text-gray-300">
+                      PaddleOCR {!isAuthenticated && '(requires login)'}
+                    </span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="ocr-engine"
+                      value="tesseract"
+                      checked={ocrEngine === 'tesseract'}
+                      onChange={(e) => setOcrEngine(e.target.value as 'paddleocr' | 'tesseract')}
+                      className="w-4 h-4 text-purple-600 bg-gray-100 border-gray-300 focus:ring-purple-500"
+                    />
+                    <span className="text-sm text-gray-700 dark:text-gray-300">
+                      Tesseract.js
+                    </span>
+                  </label>
+                </div>
+
+                {/* Login Warning */}
+                {showLoginWarning && (
+                  <div className="mt-3 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                    <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                      ⚠️ PaddleOCR requires authentication. Please log in to use PaddleOCR, or select Tesseract.js for offline processing.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Preprocessing Methods Selector */}
+              <div className="bg-white dark:bg-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
+                <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-3">
+                  Select Preprocessing Methods (multiple):
+                </h3>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {(Object.keys(methodLabels) as PreprocessMethod[]).map(method => (
+                    <label
+                      key={method}
+                      className="flex items-center gap-2 p-2 rounded border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedMethods.has(method)}
+                        onChange={() => toggleMethod(method)}
+                        className="w-4 h-4 text-purple-600 bg-gray-100 border-gray-300 rounded focus:ring-purple-500"
+                      />
+                      <span className="text-sm text-gray-700 dark:text-gray-300">
+                        {methodLabels[method]}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+
+                {/* Process and Cancel Buttons */}
+                <div className="mt-4 flex gap-2">
+                  <button
+                    onClick={processAllMethods}
+                    disabled={isProcessing || selectedMethods.size === 0}
+                    className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 rounded-lg transition-colors"
+                  >
+                    {isProcessing ? (
+                      <>
+                        <Loader size={16} className="animate-spin" />
+                        {processingProgress || 'Processing...'}
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle size={16} />
+                        Process {selectedMethods.size} Method{selectedMethods.size !== 1 ? 's' : ''}
+                      </>
+                    )}
+                  </button>
+
+                  {isProcessing && (
+                    <button
+                      onClick={() => {
+                        isCancelledRef.current = true;
+                      }}
+                      className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+                      title="Cancel processing"
+                    >
+                      <X size={16} />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Side-by-Side Results Comparison */}
+              {results.length > 0 && (
+                <div className="bg-white dark:bg-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
+                  <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-4">
+                    Processing Results ({results.length} methods) - Compare Side-by-Side
+                  </h3>
+
+                  <div className={`grid gap-4 ${results.length === 1 ? 'grid-cols-1' : results.length === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
+                    {results.map((result, idx) => (
+                      <div
+                        key={idx}
+                        className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 border border-gray-300 dark:border-gray-600 flex flex-col"
+                      >
+                        {/* Header */}
+                        <div className="mb-3">
+                          <h4 className="font-medium text-gray-900 dark:text-white mb-2">
+                            {result.method}
+                          </h4>
+                          <div className="flex gap-4 text-xs text-gray-600 dark:text-gray-400">
+                            <span>Confidence: {(result.confidence * 100).toFixed(1)}%</span>
+                            <span>Products: {result.productCount}</span>
+                            <span>Chars: {result.text.length}</span>
+                          </div>
+                        </div>
+
+                        {/* Preprocessed Image Preview - Clickable */}
+                        {result.preprocessedImageUrl && (
+                          <div className="mb-3">
+                            <a
+                              href={result.preprocessedImageUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="block cursor-pointer hover:opacity-80 transition-opacity"
+                              title="Click to open full image in new tab"
+                            >
+                              <img
+                                src={result.preprocessedImageUrl}
+                                alt={`${result.method} preprocessed`}
+                                className="w-full h-32 object-contain bg-white dark:bg-gray-900 rounded border border-gray-300 dark:border-gray-600"
+                              />
+                            </a>
+                          </div>
+                        )}
+
+                        {/* Full OCR Text in Textarea */}
+                        <div className="flex-1 mb-3">
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                              Full OCR Text:
+                            </label>
+                            {result.preprocessedImageUrl && (
+                              <a
+                                href={result.preprocessedImageUrl}
+                                download={`${result.method}-preprocessed.png`}
+                                className="text-xs text-purple-600 dark:text-purple-400 hover:underline"
+                                title="Download preprocessed image"
+                              >
+                                📥 Download Image
+                              </a>
+                            )}
+                          </div>
+                          <textarea
+                            readOnly
+                            value={result.text}
+                            className="w-full h-96 text-xs font-mono bg-white dark:bg-gray-900 p-2 rounded border border-gray-200 dark:border-gray-700 resize-none"
+                          />
+                        </div>
+
+                        {/* Import Button */}
+                        <button
+                          onClick={() => {
+                            const listings: MarketplaceListing[] = result.products.map(product => ({
+                              id: crypto.randomUUID(),
+                              TITLE: product.name,
+                              PRICE: product.price || 0,
+                              CONDITION: (product.condition || 'New') as 'New' | 'Used - Like New' | 'Used - Good' | 'Used - Fair',
+                              DESCRIPTION: product.description || product.name,
+                              CATEGORY: product.category || '',
+                              'OFFER SHIPPING': 'Yes' as 'Yes' | 'No'
+                            }));
+                            onProductsImport?.(listings);
+                            onClose();
+                          }}
+                          className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors"
+                        >
+                          <CheckCircle size={16} />
+                          Import This Result
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+

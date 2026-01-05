@@ -295,17 +295,27 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
           {/* Error/Success Messages */}
           {error && (
             <div className="p-3 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200 rounded flex items-center justify-between">
-              <span>{error}</span>
-              <button onClick={() => setError(null)} className="text-red-700 dark:text-red-200">
-                <X className="w-4 h-4" />
+              <span className="select-text">{error}</span>
+              <button
+                onClick={() => setError(null)}
+                className="text-red-700 dark:text-red-200"
+                aria-label="Dismiss error message"
+                data-testid="dismiss-error-button"
+              >
+                <X className="w-4 h-4" aria-hidden="true" />
               </button>
             </div>
           )}
           {success && (
             <div className="p-3 bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-200 rounded flex items-center justify-between">
-              <span>{success}</span>
-              <button onClick={() => setSuccess(null)} className="text-green-700 dark:text-green-200">
-                <X className="w-4 h-4" />
+              <span className="select-text">{success}</span>
+              <button
+                onClick={() => setSuccess(null)}
+                className="text-green-700 dark:text-green-200"
+                aria-label="Dismiss success message"
+                data-testid="dismiss-success-button"
+              >
+                <X className="w-4 h-4" aria-hidden="true" />
               </button>
             </div>
           )}

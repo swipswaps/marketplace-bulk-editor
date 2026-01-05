@@ -7,6 +7,10 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "typecheck": "tsc --noEmit",
+    "check": "npm run typecheck && npm run lint",
+    "fix": "npm run lint:fix",
     "preview": "vite preview",
     "deploy": "npm run build && gh-pages -d dist"
   },
@@ -16,6 +20,7 @@
     "@types/d3": "^7.4.3",
     "d3": "^7.9.0",
     "embla-carousel-react": "^8.6.0",
+    "img-comparison-slider": "^8.0.6",
     "lucide-react": "^0.561.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",

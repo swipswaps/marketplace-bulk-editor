@@ -457,41 +457,212 @@ def process_with_paddleocr(image_path: str) -> Tuple[str, float, List[Dict[str, 
     return raw_text, float(avg_confidence), blocks
 
 
-def process_with_tesseract(image_path: str) -> Tuple[str, float]:
+def process_with_tesseract(image_path: str, psm_mode: int = 3, oem_mode: int = 3) -> Tuple[str, float]:
     """
     Process image with Tesseract
+
+    Args:
+        image_path: Path to image file
+        psm_mode: Page segmentation mode (default 3 = fully automatic)
+            - 3: Fully automatic page segmentation (default) - BEST for full pages
+            - 4: Assume a single column of text of variable sizes
+            - 6: Assume a single uniform block of text - GOOD for buttons/UI
+            - 11: Sparse text - GOOD for scattered UI elements
+        oem_mode: OCR Engine Mode (default 3 = both legacy + LSTM)
+            - 0: Legacy engine only
+            - 1: Neural nets LSTM engine only
+            - 2: Legacy + LSTM engines
+            - 3: Default, based on what is available (BEST)
+
     Returns: (raw_text, confidence)
     """
     if not TESSERACT_AVAILABLE:
         raise RuntimeError("Tesseract is not available")
-    
+
     img = Image.open(image_path)
-    raw_text = pytesseract.image_to_string(img)
-    
+
+    # Build Tesseract config with PSM and OEM modes
+    config = f'--psm {psm_mode} --oem {oem_mode}'
+
+    raw_text = pytesseract.image_to_string(img, config=config)
+
     # Get confidence from Tesseract
     try:
-        data = pytesseract.image_to_data(img, output_type=pytesseract.Output.DICT)
+        data = pytesseract.image_to_data(img, config=config, output_type=pytesseract.Output.DICT)
         confidences = [c for c in data['conf'] if c != -1]
         avg_confidence = sum(confidences) / len(confidences) if confidences else 0.0
     except:
         avg_confidence = 0.0
-    
+
     return raw_text, avg_confidence / 100.0  # Normalize to 0-1
 
 
-def process_image_multi_method(image_path: str, temp_dir: str) -> Dict[str, Any]:
+def process_with_tesseract_multi_psm(image_path: str) -> Tuple[str, float, int]:
+    """
+    Process image with multiple PSM modes and choose best result
+
+    Tests PSM modes 3, 4, 6, 11 and selects the one with highest score.
+    Score = confidence * text_length (prefers more text with good confidence)
+
+    Returns: (raw_text, confidence, best_psm_mode)
+    """
+    if not TESSERACT_AVAILABLE:
+        raise RuntimeError("Tesseract is not available")
+
+    img = Image.open(image_path)
+
+    # Test these PSM modes (based on empirical testing)
+    # PSM 3: Best for full pages with mixed content
+    # PSM 4: Good for single column layouts
+    # PSM 6: Good for uniform text blocks (buttons, labels)
+    # PSM 11: Good for sparse/scattered text (UI elements)
+    psm_modes_to_test = [3, 4, 6, 11]
+
+    best_result = None
+    best_score = 0.0
+    best_psm = 3
+    best_confidence = 0.0
+
+    for psm in psm_modes_to_test:
+        config = f'--psm {psm} --oem 3'
+
+        try:
+            raw_text = pytesseract.image_to_string(img, config=config)
+            data = pytesseract.image_to_data(img, config=config, output_type=pytesseract.Output.DICT)
+            confidences = [c for c in data['conf'] if c != -1]
+            avg_confidence = sum(confidences) / len(confidences) if confidences else 0.0
+
+            # Score = confidence * text_length (prefer more text with good confidence)
+            score = (avg_confidence / 100.0) * len(raw_text)
+
+            logger.info(f"Tesseract PSM {psm}: confidence={avg_confidence:.2f}%, text_len={len(raw_text)}, score={score:.2f}")
+
+            if score > best_score:
+                best_score = score
+                best_result = raw_text
+                best_confidence = avg_confidence / 100.0
+                best_psm = psm
+        except Exception as e:
+            logger.warning(f"Tesseract PSM {psm} failed: {e}")
+
+    if best_result is None:
+        raise RuntimeError("All Tesseract PSM modes failed")
+
+    logger.info(f"Best Tesseract result: PSM {best_psm} (score={best_score:.2f})")
+
+    return best_result, best_confidence, best_psm
+
+
+def preprocess_for_tesseract(image_path: str, output_dir: str) -> List[Tuple[str, str]]:
+    """
+    Preprocessing optimized specifically for Tesseract
+
+    Tesseract works best with:
+    - High contrast black text on white background
+    - Binary (thresholded) images
+    - Upscaled images for small text
+
+    Different from PaddleOCR preprocessing which uses sharpening.
+
+    Returns: List of (method_name, preprocessed_path) tuples
+    """
+    try:
+        import cv2
+    except ImportError:
+        logger.warning("OpenCV not available, skipping Tesseract-specific preprocessing")
+        return []
+
+    img = cv2.imread(image_path)
+    if img is None:
+        logger.error(f"Failed to load image: {image_path}")
+        return []
+
+    preprocessed = []
+    base_name = os.path.splitext(os.path.basename(image_path))[0]
+
+    # 1. Grayscale + Otsu thresholding (BEST for Tesseract)
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    thresh_path = os.path.join(output_dir, f"{base_name}_thresh.png")
+    cv2.imwrite(thresh_path, thresh)
+    preprocessed.append(('threshold', thresh_path))
+
+    # 2. Adaptive thresholding (GOOD for varying lighting)
+    adaptive = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
+    adaptive_path = os.path.join(output_dir, f"{base_name}_adaptive.png")
+    cv2.imwrite(adaptive_path, adaptive)
+    preprocessed.append(('adaptive', adaptive_path))
+
+    # 3. Upscale + threshold (GOOD for small text like buttons)
+    height, width = img.shape[:2]
+    if width < 2000 or height < 2000:
+        upscaled = cv2.resize(img, None, fx=2.0, fy=2.0, interpolation=cv2.INTER_CUBIC)
+        gray_up = cv2.cvtColor(upscaled, cv2.COLOR_BGR2GRAY)
+        _, thresh_up = cv2.threshold(gray_up, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        upscaled_path = os.path.join(output_dir, f"{base_name}_upscaled_thresh.png")
+        cv2.imwrite(upscaled_path, thresh_up)
+        preprocessed.append(('upscaled_threshold', upscaled_path))
+
+    logger.info(f"Created {len(preprocessed)} Tesseract-specific preprocessed versions")
+    return preprocessed
+
+
+def process_image_multi_method(
+    image_path: str,
+    temp_dir: str,
+    preprocess_method: str = 'auto',
+    multi_resolution: bool = True
+) -> Dict[str, Any]:
     """
     Process image with multiple preprocessing methods and choose best result
-    
+
+    Args:
+        image_path: Path to image file
+        temp_dir: Temporary directory for preprocessed images
+        preprocess_method: Which preprocessing to use:
+            - 'auto': Test all methods and choose best (default)
+            - 'threshold': Binary threshold only
+            - 'adaptive': Adaptive threshold only
+            - 'upscale': Upscale + threshold only
+            - 'all': Test all methods (same as 'auto')
+        multi_resolution: Whether to test multiple resolutions (default True)
+
     Strategy:
     1. Try PaddleOCR on all preprocessed versions
     2. If PaddleOCR fails, fall back to Tesseract
     3. Choose result with highest confidence and most text
     """
     start_time = time.time()
-    
-    # Create preprocessed versions
-    preprocessed_images = preprocess_image_enhanced(image_path, temp_dir)
+
+    # Create preprocessed versions based on user preference
+    if preprocess_method == 'auto' or preprocess_method == 'all':
+        # Test all methods
+        preprocessed_images = preprocess_image_enhanced(image_path, temp_dir)
+    else:
+        # Use specific method only
+        preprocessed_images = []
+        base_name = os.path.splitext(os.path.basename(image_path))[0]
+
+        if preprocess_method == 'threshold':
+            # Tesseract-specific threshold preprocessing
+            tesseract_prep = preprocess_for_tesseract(image_path, temp_dir)
+            preprocessed_images = [p for p in tesseract_prep if 'thresh' in p[0] and 'adaptive' not in p[0]]
+        elif preprocess_method == 'adaptive':
+            # Tesseract-specific adaptive threshold
+            tesseract_prep = preprocess_for_tesseract(image_path, temp_dir)
+            preprocessed_images = [p for p in tesseract_prep if 'adaptive' in p[0]]
+        elif preprocess_method == 'upscale':
+            # Tesseract-specific upscale + threshold
+            tesseract_prep = preprocess_for_tesseract(image_path, temp_dir)
+            preprocessed_images = [p for p in tesseract_prep if 'upscaled' in p[0]]
+
+        # If no images created (e.g., image too large for upscale), fall back to original
+        if not preprocessed_images:
+            logger.warning(f"No preprocessed images for method '{preprocess_method}', using original")
+            img = Image.open(image_path)
+            original_path = os.path.join(temp_dir, f"{base_name}_original.png")
+            img.save(original_path)
+            preprocessed_images = [('original', original_path)]
     
     best_result = None
     best_score = 0.0
@@ -521,22 +692,30 @@ def process_image_multi_method(image_path: str, temp_dir: str) -> Dict[str, Any]
     
     # Fall back to Tesseract if PaddleOCR failed or not available
     if best_result is None and TESSERACT_AVAILABLE:
-        for method_name, prep_path in preprocessed_images:
+        # Create Tesseract-specific preprocessed images (threshold, adaptive, upscaled)
+        tesseract_preprocessed = preprocess_for_tesseract(image_path, temp_dir)
+
+        # If OpenCV not available, fall back to PaddleOCR preprocessing
+        if not tesseract_preprocessed:
+            tesseract_preprocessed = preprocessed_images
+
+        for method_name, prep_path in tesseract_preprocessed:
             try:
-                raw_text, confidence = process_with_tesseract(prep_path)
+                # Test multiple PSM modes and choose best
+                raw_text, confidence, best_psm = process_with_tesseract_multi_psm(prep_path)
                 score = confidence * len(raw_text)
-                
-                logger.info(f"Tesseract ({method_name}): confidence={confidence:.2f}, text_len={len(raw_text)}, score={score:.2f}")
-                
+
+                logger.info(f"Tesseract ({method_name}, PSM {best_psm}): confidence={confidence:.2f}, text_len={len(raw_text)}, score={score:.2f}")
+
                 if score > best_score:
                     best_score = score
                     best_result = {
                         'raw_text': raw_text,
                         'confidence': confidence,
                         'blocks': [],
-                        'method': f'tesseract_{method_name}'
+                        'method': f'tesseract_{method_name}_psm{best_psm}'
                     }
-                    method_used = f'tesseract_{method_name}'
+                    method_used = f'tesseract_{method_name}_psm{best_psm}'
             except Exception as e:
                 logger.warning(f"Tesseract failed on {method_name}: {e}")
     

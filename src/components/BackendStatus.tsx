@@ -134,14 +134,16 @@ export function BackendStatus({ className = '' }: BackendStatusProps) {
 
   return (
     <div className={`${className}`}>
-      {/* Status Indicator */}
-      <div className={`border rounded-lg p-3 ${getStatusColor()}`}>
+      {/* Status Indicator - Collapsible dropdown button */}
+      {/* LLM Navigation: This is the main dropdown that reveals error details and setup instructions */}
+      <div className={`border rounded-lg p-3 ${getStatusColor()}`} data-testid="backend-status-container">
         <button
           onClick={() => setIsExpanded(!isExpanded)}
           className="btn-mobile w-full flex items-center justify-between gap-2 select-text"
-          aria-label={`Backend status: ${health.message}. Click to ${isExpanded ? 'collapse' : 'expand'} details.`}
+          aria-label={`Backend status: ${health.message}. Click to ${isExpanded ? 'collapse' : 'expand'} error details and setup instructions.`}
           aria-expanded={isExpanded}
           aria-controls="backend-status-details"
+          data-testid="backend-error-dropdown"
         >
           <div className="flex items-center gap-2">
             {getStatusIcon()}
@@ -294,34 +296,47 @@ export function BackendStatus({ className = '' }: BackendStatusProps) {
                 ) : (
                   <>
                     <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
-                      🚀 Start Docker Backend
-                    </p>
-                    <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">
-                      For high-accuracy OCR and full backend features, run the automated setup:
+                      ⚠️ Docker Backend Required
                     </p>
 
-                    {/* Quick Setup Section */}
+                    {/* Fallback info - matching receipts-ocr style */}
+                    <div className="mb-3 p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded border border-yellow-200 dark:border-yellow-800">
+                      <p className="text-xs text-gray-700 dark:text-gray-300">
+                        📋 Currently using browser-based Tesseract.js (lower accuracy)
+                      </p>
+                      <p className="text-xs font-medium text-gray-900 dark:text-gray-100 mt-1">
+                        🚀 <strong>For 10x better results</strong>, run the automated setup:
+                      </p>
+                    </div>
+
+                    {/* Quick Setup Section - Platform-specific like receipts-ocr */}
                     <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800">
                       <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
                         🎯 Quick Setup (one command)
                       </p>
                       <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
-                        Open Terminal and paste:
+                        Open {isWindows ? 'PowerShell (Admin)' : 'Terminal'} and paste:
                       </p>
                       <div className="relative">
                         <code className="block p-2 bg-white dark:bg-gray-900 rounded text-xs font-mono pr-16 overflow-x-auto">
-                          curl -fsSL https://raw.githubusercontent.com/swipswaps/marketplace-bulk-editor/main/scripts/setup.sh | bash
+                          {isWindows
+                            ? 'irm https://raw.githubusercontent.com/swipswaps/marketplace-bulk-editor/main/scripts/setup.ps1 | iex'
+                            : 'curl -fsSL https://raw.githubusercontent.com/swipswaps/marketplace-bulk-editor/main/scripts/setup.sh | bash'
+                          }
                         </code>
                         <button
                           onClick={async () => {
+                            const command = isWindows
+                              ? 'irm https://raw.githubusercontent.com/swipswaps/marketplace-bulk-editor/main/scripts/setup.ps1 | iex'
+                              : 'curl -fsSL https://raw.githubusercontent.com/swipswaps/marketplace-bulk-editor/main/scripts/setup.sh | bash';
                             try {
-                              await navigator.clipboard.writeText('curl -fsSL https://raw.githubusercontent.com/swipswaps/marketplace-bulk-editor/main/scripts/setup.sh | bash');
+                              await navigator.clipboard.writeText(command);
                               setCopied(true);
                               setTimeout(() => setCopied(false), 2000);
                             } catch {
                               // Fallback for older browsers
                               const el = document.createElement('textarea');
-                              el.value = 'curl -fsSL https://raw.githubusercontent.com/swipswaps/marketplace-bulk-editor/main/scripts/setup.sh | bash';
+                              el.value = command;
                               document.body.appendChild(el);
                               el.select();
                               document.execCommand('copy');
@@ -333,7 +348,7 @@ export function BackendStatus({ className = '' }: BackendStatusProps) {
                           className="absolute top-2 right-2 px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 select-text"
                           title="Copy to clipboard"
                         >
-                          {copied ? '✓ Copied' : '📋 Copy'}
+                          {copied ? '✓' : '📋'}
                         </button>
                       </div>
                       <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
@@ -372,34 +387,60 @@ export function BackendStatus({ className = '' }: BackendStatusProps) {
                       </ol>
                     </details>
 
-                    {/* Download Script Button */}
-                    <div className="mt-3 flex gap-2">
-                      <a
-                        href="https://raw.githubusercontent.com/swipswaps/marketplace-bulk-editor/main/scripts/setup.sh"
-                        download="setup.sh"
-                        className="inline-flex items-center gap-1 px-3 py-1 text-xs bg-gray-600 text-white rounded hover:bg-gray-700"
+                    {/* Action Buttons - matching receipts-ocr style */}
+                    {/* LLM Navigation: These buttons appear after expanding the error dropdown */}
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        onClick={checkBackend}
+                        disabled={false}
+                        className="inline-flex items-center gap-1 px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        data-testid="test-connection-button"
+                        aria-label="Test connection to Docker backend"
                       >
-                        📥 Download setup.sh
-                      </a>
+                        🔁 Test Connection
+                      </button>
                       <a
-                        href="https://raw.githubusercontent.com/swipswaps/marketplace-bulk-editor/main/scripts/setup.ps1"
-                        download="setup.ps1"
+                        href={isWindows
+                          ? "https://raw.githubusercontent.com/swipswaps/marketplace-bulk-editor/main/scripts/setup.ps1"
+                          : "https://raw.githubusercontent.com/swipswaps/marketplace-bulk-editor/main/scripts/setup.sh"
+                        }
+                        download={isWindows ? "setup.ps1" : "setup.sh"}
                         className="inline-flex items-center gap-1 px-3 py-1 text-xs bg-gray-600 text-white rounded hover:bg-gray-700"
+                        data-testid="download-script-button"
+                        aria-label={`Download ${isWindows ? 'PowerShell' : 'Bash'} setup script`}
                       >
-                        📥 Download setup.ps1 (Windows)
+                        📥 Download Script
                       </a>
                     </div>
+
+                    {/* Troubleshooting Link - matching receipts-ocr style */}
+                    {/* LLM Navigation: This link appears below the action buttons */}
+                    <a
+                      href="https://github.com/swipswaps/marketplace-bulk-editor#troubleshooting-docker"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-3 inline-flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                      data-testid="troubleshooting-link"
+                      aria-label="Open troubleshooting guide on GitHub"
+                    >
+                      📚 Troubleshooting Guide
+                    </a>
                   </>
                 )}
-                <a
-                  href="https://github.com/swipswaps/marketplace-bulk-editor#docker-deployment"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-2 inline-flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:underline"
-                >
-                  <ExternalLink size={12} />
-                  Setup Guide
-                </a>
+                {/* Keep existing Setup Guide link for GitHub Pages */}
+                {isGitHubPages && (
+                  <a
+                    href="https://github.com/swipswaps/marketplace-bulk-editor#docker-deployment"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-2 inline-flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                    data-testid="setup-guide-link"
+                    aria-label="Open Docker deployment setup guide on GitHub"
+                  >
+                    <ExternalLink size={12} aria-hidden="true" />
+                    <span className="select-text">Setup Guide</span>
+                  </a>
+                )}
               </div>
             )}
           </div>

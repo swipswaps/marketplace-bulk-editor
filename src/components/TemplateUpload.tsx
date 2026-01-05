@@ -178,7 +178,7 @@ export function TemplateUpload({ onTemplateLoad, currentTemplate }: TemplateUplo
               : 'border-gray-300 dark:border-gray-600 hover:border-blue-400 dark:hover:border-blue-500'
           }`}
         >
-          <input {...getInputProps()} />
+          <input {...getInputProps()} aria-label="Upload Excel template file" data-testid="template-upload-input" />
           <div className="flex flex-col items-center gap-2">
             {isProcessing ? (
               <>

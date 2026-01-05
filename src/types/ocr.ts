@@ -22,6 +22,7 @@ export interface OcrResponse {
   confidence_score?: number;
   processing_time?: number;
   error?: string;
+  preprocessed_image_url?: string; // URL of preprocessed image for comparison
 }
 
 export interface OcrScan {

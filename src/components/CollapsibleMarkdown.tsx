@@ -279,7 +279,13 @@ export function CollapsibleMarkdown({ content, showTableOfContents = true }: Col
                     remarkPlugins={[remarkGfm]}
                     components={{
                       a: ({ ...props }) => (
-                        <a {...props} target="_blank" rel="noopener noreferrer" />
+                        <a
+                          {...props}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="select-text"
+                          aria-label={`External link: ${props.href || 'unknown'}`}
+                        />
                       ),
                       code: ({ inline, className, children, ...props }: { inline?: boolean; className?: string; children?: React.ReactNode }) => (
                         <CodeBlock inline={inline} className={className} {...props}>

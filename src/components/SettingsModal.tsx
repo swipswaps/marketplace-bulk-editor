@@ -7,6 +7,7 @@ import { CollapsibleMarkdown } from './CollapsibleMarkdown';
 import { KeyboardShortcutsReference } from './KeyboardShortcutsReference';
 import { BackupManager } from './BackupManager';
 import { DebugConsole } from './DebugConsole';
+import { BackendStatus } from './BackendStatus';
 import backendDocsMarkdown from '../../docs/HOW_TO_USE_DOCKER_BACKEND.md?raw';
 import userGuideMarkdown from '../../docs/USER_GUIDE.md?raw';
 
@@ -383,6 +384,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           {/* Backend Guide Tab - Docker Setup */}
           {activeTab === 'backend' && (
             <div className="space-y-4">
+              {/* Backend Status Component */}
+              <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                  <Database size={20} />
+                  Docker Backend Status
+                </h3>
+                <BackendStatus />
+              </div>
+
+              {/* Docker Setup Documentation */}
               <CollapsibleMarkdown content={backendDocsContent} showTableOfContents={true} />
             </div>
           )}
