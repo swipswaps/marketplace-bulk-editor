@@ -142,12 +142,13 @@ export function SimplifiedOCRUpload({ onClose, onProductsImport }: SimplifiedOCR
 
   // Crop image to selected area
   const cropImageToArea = async (): Promise<string> => {
-    if (!cropArea || !imageRef.current || !uploadedImage) {
+    if (!cropArea || !imageRef.current || !containerRef.current || !uploadedImage) {
       throw new Error('No crop area selected or image not loaded');
     }
 
     return new Promise((resolve, reject) => {
       const displayedImg = imageRef.current!;
+      const container = containerRef.current!;
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
 
@@ -161,38 +162,87 @@ export function SimplifiedOCRUpload({ onClose, onProductsImport }: SimplifiedOCR
       sourceImg.crossOrigin = 'anonymous';
 
       sourceImg.onload = () => {
-        // Calculate scale between displayed image and original image
-        // displayedImg.getBoundingClientRect() gives actual displayed size (after zoom/transform)
-        const displayRect = displayedImg.getBoundingClientRect();
-        const scaleX = sourceImg.naturalWidth / displayRect.width;
-        const scaleY = sourceImg.naturalHeight / displayRect.height;
+        // Crop area coordinates are relative to CONTAINER
+        // Image is centered in container and may be zoomed/rotated
+        // Need to map container coordinates to image coordinates
 
-        // Calculate cropped area dimensions in original image coordinates
-        const cropX = cropArea.x * scaleX;
-        const cropY = cropArea.y * scaleY;
-        const cropWidth = cropArea.width * scaleX;
-        const cropHeight = cropArea.height * scaleY;
+        const containerRect = container.getBoundingClientRect();
+        const imageRect = displayedImg.getBoundingClientRect();
+
+        // Calculate image position within container
+        const imageOffsetX = imageRect.left - containerRect.left;
+        const imageOffsetY = imageRect.top - containerRect.top;
+
+        // Adjust crop coordinates to be relative to image (not container)
+        const cropRelativeToImage = {
+          x: cropArea.x - imageOffsetX,
+          y: cropArea.y - imageOffsetY,
+          width: cropArea.width,
+          height: cropArea.height
+        };
+
+        // Get the displayed image's natural size (before CSS transforms)
+        const naturalWidth = displayedImg.naturalWidth;
+        const naturalHeight = displayedImg.naturalHeight;
+
+        // Get the displayed image's rendered size (after max-height but before zoom/rotate)
+        const displayedWidth = displayedImg.width;
+        const displayedHeight = displayedImg.height;
+
+        // Calculate scale from displayed size to natural size
+        const scaleX = naturalWidth / displayedWidth;
+        const scaleY = naturalHeight / displayedHeight;
+
+        console.log('Crop mapping:', {
+          cropArea,
+          cropRelativeToImage,
+          containerRect: { width: containerRect.width, height: containerRect.height },
+          imageRect: { width: imageRect.width, height: imageRect.height },
+          imageOffset: { x: imageOffsetX, y: imageOffsetY },
+          displayedSize: { width: displayedWidth, height: displayedHeight },
+          naturalSize: { width: naturalWidth, height: naturalHeight },
+          scale: { x: scaleX, y: scaleY },
+          zoomLevel,
+          rotation
+        });
+
+        // Map crop coordinates from displayed image to natural image
+        const cropX = cropRelativeToImage.x * scaleX;
+        const cropY = cropRelativeToImage.y * scaleY;
+        const cropWidth = cropRelativeToImage.width * scaleX;
+        const cropHeight = cropRelativeToImage.height * scaleY;
+
+        // Clamp to image boundaries
+        const clampedX = Math.max(0, Math.min(cropX, naturalWidth));
+        const clampedY = Math.max(0, Math.min(cropY, naturalHeight));
+        const clampedWidth = Math.min(cropWidth, naturalWidth - clampedX);
+        const clampedHeight = Math.min(cropHeight, naturalHeight - clampedY);
+
+        console.log('Cropping:', {
+          original: { x: cropX, y: cropY, width: cropWidth, height: cropHeight },
+          clamped: { x: clampedX, y: clampedY, width: clampedWidth, height: clampedHeight }
+        });
 
         // Set canvas size to cropped area
-        canvas.width = cropWidth;
-        canvas.height = cropHeight;
+        canvas.width = clampedWidth;
+        canvas.height = clampedHeight;
 
         // Draw cropped portion from original image
         ctx.drawImage(
           sourceImg,
-          cropX,      // source x
-          cropY,      // source y
-          cropWidth,  // source width
-          cropHeight, // source height
-          0,          // dest x
-          0,          // dest y
-          cropWidth,  // dest width
-          cropHeight  // dest height
+          clampedX,      // source x
+          clampedY,      // source y
+          clampedWidth,  // source width
+          clampedHeight, // source height
+          0,             // dest x
+          0,             // dest y
+          clampedWidth,  // dest width
+          clampedHeight  // dest height
         );
 
         // Convert to data URL
         const croppedDataUrl = canvas.toDataURL('image/png');
-        console.log(`Cropped image: ${cropWidth}x${cropHeight}px from original ${sourceImg.naturalWidth}x${sourceImg.naturalHeight}px`);
+        console.log(`Cropped image: ${clampedWidth}x${clampedHeight}px from original ${sourceImg.naturalWidth}x${sourceImg.naturalHeight}px`);
         resolve(croppedDataUrl);
       };
 
@@ -570,15 +620,15 @@ export function SimplifiedOCRUpload({ onClose, onProductsImport }: SimplifiedOCR
                   className="relative overflow-auto max-h-[600px] bg-gray-100 dark:bg-gray-800 rounded"
                   onWheel={handleWheel}
                   onMouseDown={(e) => {
-                    if (!cropMode || !imageRef.current) return;
-                    const rect = imageRef.current.getBoundingClientRect();
+                    if (!cropMode || !containerRef.current) return;
+                    const rect = containerRef.current.getBoundingClientRect();
                     setIsDragging(true);
                     setDragStart({ x: e.clientX - rect.left, y: e.clientY - rect.top });
                     setCropArea(null);
                   }}
                   onMouseMove={(e) => {
-                    if (!cropMode || !isDragging || !dragStart || !imageRef.current) return;
-                    const rect = imageRef.current.getBoundingClientRect();
+                    if (!cropMode || !isDragging || !dragStart || !containerRef.current) return;
+                    const rect = containerRef.current.getBoundingClientRect();
                     const currentX = e.clientX - rect.left;
                     const currentY = e.clientY - rect.top;
                     setCropArea({
